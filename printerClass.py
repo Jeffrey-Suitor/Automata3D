@@ -22,7 +22,7 @@ class Printer:
 
     # Constructor {{{
 
-    def __init__(self, name, model, bldVolume, nozDiam, heatBldPlt):
+    def __init__(self, name, model, bldVolume, nozDiam, heatBldPlt):  # TODO fix this for printers
         # User vars
         self.name = name
         self.model = model
@@ -37,7 +37,7 @@ class Printer:
             pass
             #self.serial = serial.Serial(self.port, 115200)
         except serial.serialutil.SerialException:
-            self.writeNewUdevRule()
+            self.newPrinterUdev()
             #self.serial = serial.Serial(self.port, 115200)
         self.jobStart = False
         self.jobStartTime = None
@@ -192,8 +192,8 @@ class Printer:
         return None
     # }}}
 
-    # writeNewUdevRule {{{
-    def writeNewUdevRule(self):
+    # newPrinterUdev {{{
+    def newPrinterUdev(self):
         newDevice = Printer.addPrinterPort()
         ruleAlreadyExists = False
         # Udev rule to write {{{

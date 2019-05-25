@@ -5,6 +5,7 @@ import logging as log
 import uuid
 import pyqrcode
 from PIL import Image, ImageDraw, ImageFont
+import os
 # }}}
 
 
@@ -12,6 +13,10 @@ from PIL import Image, ImageDraw, ImageFont
 class Filament:
 
     fontPath = "/usr/share/fonts/nerd-fonts-complete/ttf/mononoki-Regular Nerd Font Complete Mono.ttf"
+    qrDir = "qrCodes"
+
+    if not os.path.exists(qrDir):
+        os.mkdir(qrDir)
 
     # Constructor {{{
 
@@ -116,7 +121,8 @@ class Filament:
               "ID           : " + self.id + "\n"
 
         draw.text((250, 28), msg, font=fnt, fill=(0, 0, 0))
-        img.save(self.name + "_" + self.id + "_QRCode.png")
+        img.save(Filament.qrDir + "/" + self.name + "_" + self.id + "_QR.png")
+        os.remove(tempFile)
     # }}}
 
 # }}}
