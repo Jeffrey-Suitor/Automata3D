@@ -5,7 +5,6 @@ import re
 import time
 from functools import partial
 from tkinter.filedialog import askopenfilename
-
 import PIL
 import serial
 
@@ -23,24 +22,27 @@ class Printer:
 
     # Constructor {{{
 
-    def __init__(self, name, model, bldVolume, filament, nozDiam, heatBldPlt, camera):
+    def __init__(self, name, model, bldVolume, nozDiam, heatBldPlt):
+        # User vars
         self.name = name
         self.model = model
         self.bldVolume = bldVolume  # x y z in mm
-        self.filament = filament
         self.nozzleDiameter = nozDiam
         self.heatedBuildPlate = heatBldPlt
-        self.camera = camera
+
+        self.filament = None
+        self.camera = None
         self.port = "/dev/Printers/" + self.name
         try:
-            self.serial = serial.Serial(self.port, 115200)
+            pass
+            #self.serial = serial.Serial(self.port, 115200)
         except serial.serialutil.SerialException:
             self.writeNewUdevRule()
-            self.serial = serial.Serial(self.port, 115200)
+            #self.serial = serial.Serial(self.port, 115200)
         self.jobStart = False
         self.jobStartTime = None
         self.gcode = None
-        self.serial.close()
+        # self.serial.close()
         self.bedClear = True
         # }}}
 
@@ -181,6 +183,7 @@ class Printer:
         # Poll for new device and return it {{{
         for device in iter(partial(monitor.poll, Printer.addTimeout), None):
             if device.action == 'add':
+                print("Printer found")
                 log.info("New printer found")
                 return device
         # }}}
@@ -193,14 +196,12 @@ class Printer:
     def writeNewUdevRule(self):
         newDevice = Printer.addPrinterPort()
         ruleAlreadyExists = False
-
         # Udev rule to write {{{
-        udevRule = '\nSUBSYSTEM == "tty", ' \
+        udevRule = 'SUBSYSTEM == "' + newDevice.subsystem + '", ' \
             'ATTRS{idVendor} == "' + str(newDevice.get('ID_VENDOR_ID')) + '", ' \
             'ATTRS{idProduct} == "' + newDevice.get('ID_MODEL_ID') + '", ' \
-            'SYMLINK += "Printers/' + str(self.name) + '"'
+            'SYMLINK += "Printers/' + str(self.name) + '"\n'
 
-        #'SYMLINK += "' + str(self.name) + '_Printer"'
         # }}} This may not work with multiple printer copies
 
         try:
@@ -218,4 +219,5 @@ class Printer:
         time.sleep(2)
 
     # }}}
+
 # }}}
