@@ -48,10 +48,9 @@ class Printer:
 
     # readQRCode {{{
     def readQRCode(self):
-        # QRimg = self.camera.scanForQRCode()
-        # QRimg = PIL.Image.open(self.camera.scanForQRCode())
-        codes = pyzbar.decode(self.camera.scanForQRCode())
-        # codes = pyzbar.decode(QRimg)
+        QRimg = PIL.Image.open("cameraScanStub.jpg")
+        codes = pyzbar.decode(QRimg)
+        # codes = pyzbar.decode(self.camera.scanForQRCode())
         for filamentID in codes:
             return filamentID.data.decode('utf-8')
     # }}}
