@@ -33,6 +33,8 @@ def linkPrinterAndFilament(printer, filament):
 # }}}
 
 
+# Create Devices {{{
+
 # createPrinter {{{
 def createPrinter(printerList):
     choice = None
@@ -64,9 +66,10 @@ def createPrinter(printerList):
     log.info("A printer with the following properties has been added:\n"
              "Name -> " + name + "\n"
              "Model -> " + name + "\n"
-             "Build volume -> " + xVolume + "x" + yVolume + "x" + zVolume + "\n"
-             "Nozzle diameter -> " + nozDiam + "\n"
-             "Heated build plate -> " + heatedBuildPlate + "\n")
+             "Build volume -> " + str(xVolume) + "x" +
+             str(yVolume) + "x" + str(zVolume) + "\n"
+             "Nozzle diameter -> " + str(nozDiam) + "\n"
+             "Heated build plate -> " + str(heatedBuildPlate) + "\n")
 
     # }}}
 
@@ -83,10 +86,10 @@ def createFilament(filamentList):
     # Prompt {{{
     name = input("What is the name of this filament : ")
     company = input("Who makes this filament : ")
-    mat = input("What type of  material is this filament : ")
+    mat = input("What type of material is this filament : ")
     matDia = input("What is the diameter of this filament in mm : ")
-    density = input("What is the density of this filament in g/cm^3")
-    weight = input("What is the weight of this filament in g :")
+    density = input("What is the density of this filament in g/cm^3 : ")
+    weight = input("What is the weight of this filament in g : ")
     colour = input("What colour is this filament : ")
     # }}}
 
@@ -95,9 +98,9 @@ def createFilament(filamentList):
              "Name -> " + name + "\n"
              "Company -> " + company + "\n"
              "Material -> " + mat + "\n"
-             "Material diameter -> " + matDia + "\n"
-             "Density -> " + density + "\n"
-             "Weight -> " + weight + "\n"
+             "Material diameter -> " + matDia + "mm\n"
+             "Density -> " + density + "g/cm^3\n"
+             "Weight -> " + weight + "g\n"
              "Colour -> " + colour + "\n")
     # }}}
 
@@ -108,49 +111,34 @@ def createFilament(filamentList):
 
 
 # createCamera {{{
-def createPrinter(printerList):
+def createCamera(cameraList):
     choice = None
 
     # Prompt {{{
     name = input("What is the name of this printer : ")
     model = input("What model of printer is this : ")
-    print("Please enter your build volume in the order of X, Y, Z")
-    xVolume = int(input("What is the build volume of your printer (X) : "))
-    yVolume = int(input("What is the build volume of your printer (Y) : "))
-    zVolume = int(input("What is the build volume of your printer (Z) : "))
-    bldVolume = [xVolume, yVolume, zVolume]
-    nozDiam = float(input("What is your nozzle diameter in mm : "))
-    # }}}
-
-    # heatedBuildPlate {{{
-    while choice not in ('y', 'Y', 'n', 'N'):
-        choice = input('Is your build plate heated y/n : ')
-        if choice == 'y' or choice == 'Y':  # Use currently generated reports
-            heatedBuildPlate = True
-        elif choice == 'n' or choice == 'N':  # Generate new reports
-            heatedBuildPlate = False
-        else:
-            print('This is not a valid selection')
-
+    resolution = input("What is the resolution of this camera : ")
     # }}}
 
     # logFile {{{
     log.info("A printer with the following properties has been added:\n"
              "Name -> " + name + "\n"
-             "Model -> " + name + "\n"
-             "Build volume -> " + xVolume + "x" + yVolume + "x" + zVolume + "\n"
-             "Nozzle diameter -> " + nozDiam + "\n"
-             "Heated build plate -> " + heatedBuildPlate + "\n")
+             "Model -> " + model + "\n"
+             "Resolution -> " + resolution + "\n")
 
     # }}}
 
-    instance = Printer(name, model, bldVolume, nozDiam, heatedBuildPlate)
-    printerList.append(instance)
+    instance = Camera(name, model, resolution)
+    cameraList.append(instance)
+
+# }}}
 
 # }}}
 
 
 # changeToRoot {{{
+
+
 def changeToRoot():
     if os.geteuid() != 0:
         os.execvp("sudo", ["sudo", "python3"] + sys.argv)
@@ -180,55 +168,63 @@ def mainMenu(databaseFile):
     currentTime = datetime.now().strftime("%Y-%m-%d %H:%M")
     log.info('New session started : {}'.format(currentTime))
     mainList = checkDatabase(databaseFile)
+    print(mainList)
     choice = None
     # }}}
 
-    # Prompt {{{
-    print("\n\nAutomata3d : Printer Management Software\n\n\n"
-          "Please select the number next to the option you would like\n\n"
-          "1. Begin print job\n"
-          "2. View printer status\n"
-          "3. Access filament library\n"
-          "4. View cameras\n"
-          "5. Add a new printer / filament / camera\n"
-          "6. Exit\n")
-    # }}}
     while choice != 6:
-        choice = int(input('What would you like to do : '))
-        if choice == 1:
-            print("Start print")
-        if choice == 2:
-            print("Select your printer")
-        if choice == 3:
-            print("Access filament library")
-        if choice == 4:
-            print("View cameras")
-        if choice == 5:
-            log.info("Accessing device creation menu")
-            addDeviceMenu(mainList)
-        if choice == 6:
-            # Close program {{{
-            print("Have a great day.")
-            with open(databaseFile, "wb") as f:
-                pickle.dump(mainList, f)
-            currentTime = datetime.now().strftime("%Y-%m-%d %H:%M")
-            log.info('Session closed at : {}'.format(currentTime))
-            exit()
-            # }}}
+        # Prompt {{{
+        print("\n\nAutomata3d : Printer Management Software\n\n\n"
+              "Please select the number next to the option you would like\n\n"
+              "1. Begin print job\n"
+              "2. View printer status\n"
+              "3. Access filament library\n"
+              "4. View cameras\n"
+              "5. Add a new printer / filament / camera\n"
+              "6. Exit\n")
+        # }}}
+        try:
+            choice = int(input('What would you like to do : '))
+            if choice == 1:
+                print("Start print")
+            if choice == 2:
+                print("Select your printer")
+            if choice == 3:
+                print("Access filament library")
+            if choice == 4:
+                print("View cameras")
+            if choice == 5:
+                log.info("Accessing device creation menu")
+                addDeviceMenu(databaseFile, mainList)
+            if choice == 6:
+                # Close program {{{
+                print("Have a great day.")
+                with open(databaseFile, "wb") as f:
+                    pickle.dump(mainList, f)
+                    currentTime = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    log.info('Session closed at : {}'.format(currentTime))
+                    exit()
+        except ValueError:
+            log.warning("Not a valid selection.")
+    # }}}
 # }}}
 
 
 # addDeviceMenu {{{
-def addDeviceMenu(mainList):
+def addDeviceMenu(databaseFile, mainList):
 
     choice = None
-    print("What device would you like to add ?\n"
-          "Please select the number next to the option you would like\n"
-          "1. Printer\n"
-          "2. Filament\n"
-          "3. Camera\n"
-          "4. Return to main menu\n")
     while choice != 4:
+
+        # Prompt {{{
+        print("\n\nWhat device would you like to add ?\n\n\n"
+              "Please select the number next to the option you would like\n\n"
+              "1. Printer\n"
+              "2. Filament\n"
+              "3. Camera\n"
+              "4. Return to main menu\n")
+        # }}}
+
         choice = int(input('What would you like to do : '))
         if choice == 1:
             log.info("Adding new printer")
@@ -242,4 +238,7 @@ def addDeviceMenu(mainList):
         if choice == 4:
             log.info("Returning to main menu")
             return
+
+        with open(databaseFile, "wb") as f:
+            pickle.dump(mainList, f)
 # }}}
