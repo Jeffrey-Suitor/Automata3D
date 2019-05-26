@@ -7,10 +7,8 @@ from functools import partial
 from tkinter.filedialog import askopenfilename
 import PIL
 import serial
-
 import pyudev
 from pyzbar import pyzbar
-
 # }}}
 
 
