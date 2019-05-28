@@ -94,4 +94,38 @@ class Camera:
             print("not valid")
         # }}}
 
+    # showVideoStream {{{
+    def showVideoStream(self):
+        print("Welcome to the video preview.\n"
+              "Press r to rotate the video 90.\n"
+              "Press v to flip the video vertically.\n"
+              "Press h to flip the video horizontally.\n"
+              "Press q to quit.\n")
+        cam = cv2.VideoCapture(self.port)
+        while True:
+            rotate, horflip, verflip = False
+            ret_val, img = cam.read()
+            if rotate:
+                img = cv2.rotate(img, 90)
+            if horflip:
+                img = cv2.flip(img, 1)
+            if verflip:
+                img = cv2.flip(img, 0)
+            cv2.imshow(self.printer.name, img)
+            key = cv2.waitKey(1)
+            if key == ord('r'):  # check for rotate
+                rotate = not rotate
+            elif key == ord('h'):  # check for horizontal flip
+                horflip = not horflip
+            elif key == ord('v'):  # check for vertical flip
+                verflip = not verflip
+            elif key == ord('q'):
+                log.info("Leaving camera menu")
+                break
+            else:
+                print("Not a valid key")
+
+        cv2.destroyAllWindows()
+# }}}
+
         # }}}

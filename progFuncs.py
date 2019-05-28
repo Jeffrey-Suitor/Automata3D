@@ -35,6 +35,7 @@ def linkPrinterAndFilament(printer, filament):
 
 # Create Devices {{{
 
+
 # createPrinter {{{
 def createPrinter(printerList):
     choice = None
@@ -115,8 +116,8 @@ def createCamera(cameraList):
     choice = None
 
     # Prompt {{{
-    name = input("What is the name of this printer : ")
-    model = input("What model of printer is this : ")
+    name = input("What is the name of this camera : ")
+    model = input("What model of camera is this : ")
     resolution = input("What is the resolution of this camera : ")
     # }}}
 
@@ -172,7 +173,7 @@ def mainMenu(databaseFile):
     choice = None
     # }}}
 
-    while choice != 6:
+    while choice != 7:
         # Prompt {{{
         print("\n\nAutomata3d : Printer Management Software\n\n\n"
               "Please select the number next to the option you would like\n\n"
@@ -181,22 +182,26 @@ def mainMenu(databaseFile):
               "3. Access filament library\n"
               "4. View cameras\n"
               "5. Add a new printer / filament / camera\n"
-              "6. Exit\n")
+              "6. Remove printer /filament / camera\n"
+              "7. Exit\n")
         # }}}
         try:
             choice = int(input('What would you like to do : '))
             if choice == 1:
                 print("Start print")
-            if choice == 2:
+            elif choice == 2:
                 print("Select your printer")
-            if choice == 3:
+            elif choice == 3:
                 print("Access filament library")
-            if choice == 4:
+            elif choice == 4:
                 print("View cameras")
-            if choice == 5:
+            elif choice == 5:
                 log.info("Accessing device creation menu")
                 addDeviceMenu(databaseFile, mainList)
-            if choice == 6:
+            elif choice == 6:
+                log.info("Device deletion menu")
+                deleteMenu(databaseFile, mainList)
+            elif choice == 7:
                 # Close program {{{
                 print("Have a great day.")
                 with open(databaseFile, "wb") as f:
@@ -205,7 +210,7 @@ def mainMenu(databaseFile):
                     log.info('Session closed at : {}'.format(currentTime))
                     exit()
         except ValueError:
-            log.warning("Not a valid selection.")
+            log.warning("Not a valid selection")
     # }}}
 # }}}
 
@@ -236,9 +241,123 @@ def addDeviceMenu(databaseFile, mainList):
             log.info("Adding new camera")
             createCamera(mainList[2])
         if choice == 4:
+            log.info("Linking printer and camera")
+            linkMenu(mainList[0][2])
+        if choice == 4:
+            log.info("Linking printer and filament")
+            linkMenu(mainList[0][2])
+        if choice == 4:
             log.info("Returning to main menu")
             return
 
         with open(databaseFile, "wb") as f:
             pickle.dump(mainList, f)
 # }}}
+
+
+# deleteMenu {{{
+def deleteMenu(databaseFile, mainList):
+
+    choice = None
+    while choice != 4:
+
+        # Prompt {{{
+        print("\n\nWhat device would you like to remove ?\n\n\n"
+              "Please select the number next to the option you would like\n\n"
+              "1. Printer\n"
+              "2. Filament\n"
+              "3. Camera\n"
+              "4. Return to main menu\n")
+        # }}}
+
+        choice = int(input('What would you like to do : '))
+        if choice == 1:
+            log.info("Deleting printer")
+            deleteDevice(mainList[0], "Printer")
+        if choice == 2:
+            log.info("Deleting filament spool")
+            deleteDevice(mainList[1], "Filament")
+        if choice == 3:
+            log.info("Deleting camera")
+            deleteDevice(mainList[2], "Camera")
+        if choice == 4:
+            log.info("Returning to main menu")
+            return
+
+        with open(databaseFile, "wb") as f:
+            pickle.dump(mainList, f)
+# }}}
+
+
+# deleteDevice {{{
+def deleteDevice(devList, devType):
+    choice = None
+    if len(devList) == 0:  # Check if no devices
+        log.warning("There are no {} created yet.".format(devType))
+        return
+    while choice != len(devList)+1:  # as long as user doesnt quit
+        print("What {} would you like to remove:".format(devType))
+        for i in range(len(devList)):  # print entire dev list
+            print("{0}. {1}".format(i+1, devList[i]))
+        print("{}. Quit".format(i+2))  # print quit
+        choice = int(input("Select the number of the device  to remove : "))
+        if 0 < choice <= len(devList):  # if the user selects a device
+            if confirmationPrompt():  # Confirm the user chioce
+                log.info("Removing {}".format(devList[choice-1].name))
+                del devList[choice-1]  # Delete the device
+            else:
+                log.info("Choice canceled")
+        elif choice == len(devList)+1:
+            log.info("Returning to remove menu")
+            return
+        else:
+            print("This is not a valid selection")
+            # }}}
+
+
+# confirmationPrompt {{{
+def confirmationPrompt():
+    choice = None
+    while choice not in ("y", "Y", "n", "N"):
+        choice = input("Please confirm your selection (y/n) : ")
+        if choice == "y" or choice == "Y":
+            log.info("Choice confirmed")
+            return True
+        elif choice == "n" or choice == "N":
+            log.info("Choice canceled")
+            return False
+        else:
+            print("This is not a valid selection")
+# }}}
+
+
+# checkCamerasMenu{{{
+def checkCamerasMenu(mainList):
+    choice = None
+    if len(mainList[0]) == 0:  # Check if no devices
+        log.warning("There are no Printers created yet.")
+        return
+    elif len(mainList[2]) == 0:  # Check if no devices
+        log.warning("There are no Cameras created yet.")
+        return
+    while choice != len(mainList[0])+1:  # as long as user doesnt quit
+
+        # Prompt {{{
+        print("What Printer would you like to view.")
+        for i in range(len(mainList[0])):  # print entire dev list
+            if mainList[0][i].camera is None:  # Check if camera conncted
+                print("{0}. {1} (No camera)".format(i+1, mainList[0][i].name))
+            else:
+                print("{0}. {1}".format(i+1, mainList[0][i].name))
+        print("{}. Quit".format(i+2))  # print quit
+        # }}}
+
+        choice = int(input("Select the number of the Printer to view : "))
+        if 0 < choice <= len(mainList[0]):  # if the user selects a device
+            mainList[0][choice-1].camera.showVideoStream()
+        elif choice == len(mainList[0])+1:
+            log.info("Returning to camera menu")
+            return
+        else:
+            print("This is not a valid selection")
+            # }}}
