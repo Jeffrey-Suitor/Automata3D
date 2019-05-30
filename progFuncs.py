@@ -171,7 +171,8 @@ def mainMenu(databaseFile):
             elif choice == 3:
                 print("Access filament library")
             elif choice == 4:
-                print("View cameras")
+                log.info("Viewing cameras")
+                checkCamerasMenu(mainList)
             elif choice == 5:
                 log.info("Accessing device creation menu")
                 addDeviceMenu(databaseFile, mainList)
@@ -313,12 +314,14 @@ def confirmationPrompt():
 # checkCamerasMenu{{{
 def checkCamerasMenu(mainList):
     choice = None
+
     if len(mainList[0]) == 0:  # Check if no devices
         log.warning("There are no Printers created yet.")
         return
     elif len(mainList[2]) == 0:  # Check if no devices
         log.warning("There are no Cameras created yet.")
         return
+
     while choice != len(mainList[0])+1:  # as long as user doesnt quit
 
         # Prompt {{{
