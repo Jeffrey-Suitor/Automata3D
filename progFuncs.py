@@ -9,29 +9,6 @@ from datetime import datetime
 import pickle
 # }}}
 
-# linkPrinterandCamera {{{
-
-
-def linkPrinterAndCamera(printer, camera):
-    log.info("Linking PRINTER : {0} CAMERA : {1}"
-             .format(printer.name, camera.name))
-    printer.camera = camera
-    camera.printer = printer
-    return True
-
-# }}}
-
-
-# linkPrinterAndFilament {{{
-def linkPrinterAndFilament(printer, filament):
-    log.info("Linking PRINTER : {0} FILAMENT : {1}"
-             .format(printer.name, filament.name))
-    printer.filament = filament
-    filament.printer = printer
-    return True
-
-# }}}
-
 
 # Create Devices {{{
 
@@ -227,7 +204,9 @@ def addDeviceMenu(databaseFile, mainList):
               "1. Printer\n"
               "2. Filament\n"
               "3. Camera\n"
-              "4. Return to main menu\n")
+              "4. Link printer and filament\n"
+              "5. Link printer and camera\n"
+              "6. Return to main menu\n")
         # }}}
 
         choice = int(input('What would you like to do : '))
@@ -241,12 +220,12 @@ def addDeviceMenu(databaseFile, mainList):
             log.info("Adding new camera")
             createCamera(mainList[2])
         if choice == 4:
-            log.info("Linking printer and camera")
-            linkMenu(mainList[0][2])
-        if choice == 4:
             log.info("Linking printer and filament")
-            linkMenu(mainList[0][2])
-        if choice == 4:
+            linkMenu(mainList[0], mainList[1], "filament")
+        if choice == 5:
+            log.info("Linking printer and camera")
+            linkMenu(mainList[0], mainList[2], "camera")
+        if choice == 6:
             log.info("Returning to main menu")
             return
 
@@ -361,3 +340,73 @@ def checkCamerasMenu(mainList):
         else:
             print("This is not a valid selection")
             # }}}
+
+
+# linkMenu {{{
+def linkMenu(printers, devices, devType):
+    choice = None
+    while True:
+
+        # Printer selection {{{
+        while choice != len(printers)+1:  # as long as user doesnt quit
+
+            # Prompt {{{
+            print("What Printer would you like to link.")
+            for i in range(len(printers)):  # print entire dev list
+                print("{0}. {1}".format(i+1, printers[i].name))
+            print("{}. Quit".format(i+2))  # print quit
+            # }}}
+
+            choice = int(input("Select the number of the Printer to link : "))
+            if 0 < choice <= len(printers):  # if the user selects a device
+                selectedPrinter = printers[choice-1]
+                log.info("{} to be linked.".format(selectedPrinter.name))
+                break
+            elif choice == len(printers)+1:
+                log.info("Returning to link menu")
+                return
+            else:
+                print("This is not a valid selection")
+                # }}}
+
+        # Device selection {{{
+        while choice != len(devices)+1:  # as long as user doesnt quit
+
+            # Prompt {{{
+            print("What {} would you like to link.".format(devType))
+            for i in range(len(devices)):  # print entire dev list
+                print("{0}. {1}".format(i+1, devices[i].name))
+            print("{}. Quit".format(i+2))  # print quit
+            # }}}
+
+            choice = int(
+                input("Select the number of {} to link : ".format(devType)))
+            if 0 < choice <= len(devices):  # if the user selects a device
+                chosenDevice = devices[choice-1]
+                log.info("{} to be linked.".format(chosenDevice.name))
+                break
+            elif choice == len(devices)+1:
+                log.info("Returning to link menu")
+                return
+            else:
+                print("This is not a valid selection")
+                # }}}
+
+        # linkPrinterandFilament {{{
+        if devType.lower() == "filament":
+
+            log.info("Linking PRINTER : {0} FILAMENT : {1}".format(
+                selectedPrinter.name, chosenDevice.name))
+            selectedPrinter.filament = chosenDevice
+            chosenDevice.printer = selectedPrinter
+            # }}}
+
+        # linkPrinterandCamera {{{
+        else:
+            log.info("Linking PRINTER : {0} CAMERA : {1}".format(
+                selectedPrinter.name, chosenDevice.name))
+            selectedPrinter.camera = chosenDevice
+            chosenDevice.printer = selectedPrinter
+        # }}}
+
+# }}}
