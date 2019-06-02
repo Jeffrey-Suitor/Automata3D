@@ -11,12 +11,16 @@ import pickle
 
 
 # inWrap {{{
-def inWrap(message, inType=str):
+def inWrap(message, inType=str, numCheck=None):
     while True:
         try:
+            if numCheck is not None:
+                if inType(input(message)) < 1 or inType(input(message)) > numCheck:
+                    raise ValueError
             return inType(input(message))
         except ValueError:
-            log.warning("Invalid selection. Input be {}".format(str(inType)))
+            log.warning(
+                "Invalid selection. Input should be a {}".format(inType.__name__))
 # }}}
 
 
@@ -87,7 +91,7 @@ def createFilament(filamentList):
              "Company -> " + company + "\n"
              "Material -> " + mat + "\n"
              "Material diameter -> " + str(matDia) + "mm\n"
-             "Density -> " + str(density) + "g/cm^3\n"
+             "Density -> " + str(dense) + "g/cm^3\n"
              "Weight -> " + str(weight) + "g\n"
              "Colour -> " + colour + "\n")
     # }}}
@@ -126,8 +130,7 @@ def createCamera(cameraList):
 # addDeviceMenu {{{
 def addDeviceMenu(databaseFile, mainList):
 
-    choice = None
-    while choice != 6:
+    while True:
 
         # Prompt {{{
         print("\n\nWhat device would you like to add ?\n\n\n"
@@ -140,7 +143,7 @@ def addDeviceMenu(databaseFile, mainList):
               "6. Return to main menu\n")
         # }}}
 
-        choice = int(input('What would you like to do : '))
+        choice = inWrap('What would you like to do : ', int, 6)
         if choice == 1:
             log.info("Adding new printer")
             createPrinter(mainList[0])
@@ -234,7 +237,7 @@ def mainMenu(databaseFile):
     choice = None
     # }}}
 
-    while choice != 7:
+    while True:
         # Prompt {{{
         print("\n\nAutomata3d : Printer Management Software\n\n\n"
               "Please select the number next to the option you would like\n\n"
@@ -246,7 +249,7 @@ def mainMenu(databaseFile):
               "6. Remove printer /filament / camera\n"
               "7. Exit\n")
         # }}}
-        choice = inWrap('What would you like to do : ', int)
+        choice = inWrap('What would you like to do : ', int, 7)
         if choice == 1:
             print("Start print")
         elif choice == 2:
@@ -277,8 +280,7 @@ def mainMenu(databaseFile):
 # deleteMenu {{{
 def deleteMenu(databaseFile, mainList):
 
-    choice = None
-    while choice != 4:
+    while True:
 
         # Prompt {{{
         print("\n\nWhat device would you like to remove ?\n\n\n"
@@ -289,7 +291,7 @@ def deleteMenu(databaseFile, mainList):
               "4. Return to main menu\n")
         # }}}
 
-        choice = inWrap('What would you like to do : ', int)
+        choice = inWrap('What would you like to do : ', int, 4)
         if choice == 1:
             log.info("Deleting printer")
             deleteDevice(mainList[0], "Printer")
@@ -402,4 +404,108 @@ def itemSelectionMenu(itemList):
             return
         else:
             print("This is not a valid selection")
+# }}}
+
+
+# editPropertiesMenu {{{
+def editPropertiesMenu(mainList):
+    while True:
+
+        # Prompt {{{
+        print("\n\nWhat device type would you like to edit ?\n\n\n"
+              "1. Printer\n"
+              "2. Filament\n"
+              "3. Camera\n"
+              "4. Return to main menu\n")
+        # }}}
+
+        choice = inWrap('What would you like to do : ', int, 4)
+        if choice == 1:
+            log.info("Editing printer")
+            editPrinter(mainList[0], "Printer")
+        if choice == 2:
+            log.info("Editing filament spool")
+            editFilament(mainList[1], "Filament")
+        if choice == 3:
+            log.info("Editing camera")
+            editCamera(mainList[2], "Camera")
+        if choice == 4:
+            log.info("Returning to main menu")
+            return
+
+        with open(databaseFile, "wb") as f:
+            pickle.dump(mainList, f)
+
+# }}}
+
+
+# editPrinter {{{
+def editPrinter(printerList):
+
+    # Check if no printers {{{
+    if len(printerList) == 0:  # Check if no devices
+        log.warning("There are no Printers created yet.")
+        return
+    # }}}
+
+    while True:
+
+        # Select printer {{{
+        prn = itemSelectionMenu(printerList)
+        if prn is None:
+            log.warning(
+                "No printer chosen returning to edit properties menu")
+            return
+        log.info("PRINTER : {} selected to modify".format(prn.name))
+        # }}}
+
+        bldVStr = 'x'.join(str(e) for e in prn.bldVolume)
+        while True:
+
+            # Prompt {{{
+            print("1. Name -> " + prn.name + "\n"
+                  "2. Model -> " + prn.model + "\n"
+                  "3. Build volume -> " + bldVStr + "\n"
+                  "4. Nozzle diameter -> " + str(prn.nozDiam) + "\n"
+                  "5. Heated build plate -> " + str(prn.heatBldPlt) + "\n"
+                  "6. Quit")
+            # }}}
+
+            choice = inWrap("What property to modify : ", int, 6)
+            if choice == 1:
+                oldName = prn.name
+                prn.name = inWrap("Name : {} ->".format(prn.name))
+                log.info("{0} name changed to {1}".format(oldName, prn.name))
+            if choice == 2:
+                prn.model = inWrap("Model : {} ->".format(prn.model))
+                log.info("{0} model changed to {1}".format(
+                    prn.name, prn.model))
+            if choice == 3:
+                xSize = inWrap("X build size in mm : ", int)
+                ySize = inWrap("Y build size in mm : ", int)
+                zSize = inWrap("Z build size in mm : ", int)
+                prn.buildVolume = [xSize, ySize, zSize]
+                bldVStr = 'x'.join(str(e) for e in prn.bldVolume)
+                log.info("{0} build size changed to {1}".format(
+                    prn.name, bldVStr))
+            if choice == 4:
+                prn.nozDiam = inWrap("Name : {} ->".format(prn.name), float)
+                log.info("{0} nozzle diameter changed to {1}".format(
+                    prn.name, prn.nozDiam))
+            if choice == 5:
+                while choice not in ('y', 'Y', 'n', 'N'):
+                    choice = input('Is your build plate heated y/n : ')
+                    if choice == 'y' or choice == 'Y':  # Use currently generated reports
+                        prn.heatBldPlt = True
+                    elif choice == 'n' or choice == 'N':  # Generate new reports
+                        prn.heatBldPlt = False
+                    else:
+                        print('This is not a valid selection')
+                log.info("{0} heated bed changed to {1}".format(
+                    prn.name, prn.heatBldPlt))
+            if choice == 6:
+                print("Quiting")
+                log.info("Returning to edit properties screen")
+                return
+
 # }}}
