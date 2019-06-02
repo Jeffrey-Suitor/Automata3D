@@ -32,9 +32,9 @@ def createPrinter(printerList):
     while choice not in ('y', 'Y', 'n', 'N'):
         choice = input('Is your build plate heated y/n : ')
         if choice == 'y' or choice == 'Y':  # Use currently generated reports
-            heatedBuildPlate = True
+            heatBldPlt = True
         elif choice == 'n' or choice == 'N':  # Generate new reports
-            heatedBuildPlate = False
+            heatBldPlt = False
         else:
             print('This is not a valid selection')
 
@@ -51,7 +51,7 @@ def createPrinter(printerList):
 
     # }}}
 
-    instance = Printer(name, model, bldVolume, nozDiam, heatedBuildPlate)
+    instance = Printer(name, model, bldVolume, nozDiam, heatBldPlt)
     printerList.append(instance)
 
 # }}}
@@ -65,9 +65,9 @@ def createFilament(filamentList):
     name = input("What is the name of this filament : ")
     company = input("Who makes this filament : ")
     mat = input("What type of material is this filament : ")
-    matDia = input("What is the diameter of this filament in mm : ")
-    density = input("What is the density of this filament in g/cm^3 : ")
-    weight = input("What is the weight of this filament in g : ")
+    matDia = float(input("What is the diameter of this filament in mm : "))
+    density = float(input("What is the density of this filament in g/cm^3 : "))
+    weight = int(input("What is the weight of this filament in g : "))
     colour = input("What colour is this filament : ")
     # }}}
 
@@ -95,7 +95,9 @@ def createCamera(cameraList):
     # Prompt {{{
     name = input("What is the name of this camera : ")
     model = input("What model of camera is this : ")
-    resolution = input("What is the resolution of this camera : ")
+    xRes = int(input("X resolution : "))
+    yRes = int(input("Y resolution : "))
+    resolution = [xRes, YRes]
     # }}}
 
     # logFile {{{
@@ -115,8 +117,6 @@ def createCamera(cameraList):
 
 
 # changeToRoot {{{
-
-
 def changeToRoot():
     if os.geteuid() != 0:
         os.execvp("sudo", ["sudo", "python3"] + sys.argv)
@@ -156,7 +156,7 @@ def mainMenu(databaseFile):
               "Please select the number next to the option you would like\n\n"
               "1. Begin print job\n"
               "2. View printer status\n"
-              "3. Access filament library\n"
+              "3. Edit properties\n"
               "4. View cameras\n"
               "5. Add a new printer / filament / camera\n"
               "6. Remove printer /filament / camera\n"
@@ -169,7 +169,8 @@ def mainMenu(databaseFile):
             elif choice == 2:
                 print("Select your printer")
             elif choice == 3:
-                print("Access filament library")
+                log.info("Editing properties")
+                editPropertiesMenu(mainList)
             elif choice == 4:
                 log.info("Viewing cameras")
                 checkCamerasMenu(mainList)
@@ -273,20 +274,18 @@ def deleteMenu(databaseFile, mainList):
 def deleteDevice(devList, devType):
     choice = None
     if len(devList) == 0:  # Check if no devices
-        log.warning("There are no {} created yet.".format(devType))
+        log.warning("There are no {}s created yet.".format(devType))
         return
     while choice != len(devList)+1:  # as long as user doesnt quit
         print("What {} would you like to remove:".format(devType))
         for i in range(len(devList)):  # print entire dev list
-            print("{0}. {1}".format(i+1, devList[i]))
+            print("{0}. {1}".format(i+1, devList[i].name))
         print("{}. Quit".format(i+2))  # print quit
         choice = int(input("Select the number of the device  to remove : "))
         if 0 < choice <= len(devList):  # if the user selects a device
             if confirmationPrompt():  # Confirm the user chioce
                 log.info("Removing {}".format(devList[choice-1].name))
                 del devList[choice-1]  # Delete the device
-            else:
-                log.info("Choice canceled")
         elif choice == len(devList)+1:
             log.info("Returning to remove menu")
             return
@@ -321,95 +320,243 @@ def checkCamerasMenu(mainList):
     elif len(mainList[2]) == 0:  # Check if no devices
         log.warning("There are no Cameras created yet.")
         return
-
-    while choice != len(mainList[0])+1:  # as long as user doesnt quit
-
-        # Prompt {{{
+    while True:
         print("What Printer would you like to view.")
-        for i in range(len(mainList[0])):  # print entire dev list
-            if mainList[0][i].camera is None:  # Check if camera conncted
-                print("{0}. {1} (No camera)".format(i+1, mainList[0][i].name))
-            else:
-                print("{0}. {1}".format(i+1, mainList[0][i].name))
-        print("{}. Quit".format(i+2))  # print quit
-        # }}}
-
-        choice = int(input("Select the number of the Printer to view : "))
-        if 0 < choice <= len(mainList[0]):  # if the user selects a device
-            mainList[0][choice-1].camera.showVideoStream()
-        elif choice == len(mainList[0])+1:
-            log.info("Returning to camera menu")
+        printer = itemSelectionMenu(mainList[0], "Printer")
+        if printer is None:
+            log.warning("No printer selected returning to main menu.")
             return
+        elif printer.camera is None:  # Check if camera conncted
+            log.warning("No camera detected for {}.".format(printer.name))
         else:
-            print("This is not a valid selection")
-            # }}}
+            printer.camera.showVideoStream()
+# }}}
 
 
 # linkMenu {{{
 def linkMenu(printers, devices, devType):
+
+    print("What Printer would you like to link.")
+    selectedPrinter = itemSelectionMenu(printers, "Printer")
+    print("What {} would you like to link.".format(devType))
+    chosenDevice = itemSelectionMenu(printers, devType)
+    if selectedPrinter is None or chosenDevice is None:
+        log.warning("No device selected return to main menu")
+
+    # linkPrinterandFilament {{{
+    elif devType.lower() == "filament":
+
+        log.info("Linking PRINTER : {0} FILAMENT : {1}".format(
+            selectedPrinter.name, chosenDevice.name))
+        selectedPrinter.filament = chosenDevice
+        chosenDevice.printer = selectedPrinter
+        # }}}
+
+    # linkPrinterandCamera {{{
+    else:
+        log.info("Linking PRINTER : {0} CAMERA : {1}".format(
+            selectedPrinter.name, chosenDevice.name))
+        selectedPrinter.camera = chosenDevice
+        chosenDevice.printer = selectedPrinter
+        # }}}
+
+# }}}
+
+
+# itemSelectionMenu {{{
+def itemSelectionMenu(itemList, type):
     choice = None
     while True:
-
-        # Printer selection {{{
-        while choice != len(printers)+1:  # as long as user doesnt quit
-
-            # Prompt {{{
-            print("What Printer would you like to link.")
-            for i in range(len(printers)):  # print entire dev list
-                print("{0}. {1}".format(i+1, printers[i].name))
+        while choice != len(itemList)+1:  # as long as user doesnt quit
+            for i in range(len(itemList)):
+                print("{0}. {1}".format(i+1, itemList[i].name))
             print("{}. Quit".format(i+2))  # print quit
-            # }}}
 
-            choice = int(input("Select the number of the Printer to link : "))
-            if 0 < choice <= len(printers):  # if the user selects a device
-                selectedPrinter = printers[choice-1]
-                log.info("{} to be linked.".format(selectedPrinter.name))
-                break
-            elif choice == len(printers)+1:
-                log.info("Returning to link menu")
-                return
+            choice = int(input("Select the choice number : "))
+            if 0 < choice <= len(itemList):  # if the user selects a device
+                selectedItem = itemList[choice-1]
+                log.info("{} to be linked.".format(selectedItem.name))
+                return selectedItem
+            elif choice == len(itemList)+1:
+                log.info("No item selected")
+                return None
             else:
                 print("This is not a valid selection")
-                # }}}
+# }}}
 
-        # Device selection {{{
-        while choice != len(devices)+1:  # as long as user doesnt quit
 
-            # Prompt {{{
-            print("What {} would you like to link.".format(devType))
-            for i in range(len(devices)):  # print entire dev list
-                print("{0}. {1}".format(i+1, devices[i].name))
-            print("{}. Quit".format(i+2))  # print quit
-            # }}}
+# Edit Properties {{{
+# editPropertiesMenu {{{
+def editPropertiesMenu(mainList):
+    choice = None
 
-            choice = int(
-                input("Select the number of {} to link : ".format(devType)))
-            if 0 < choice <= len(devices):  # if the user selects a device
-                chosenDevice = devices[choice-1]
-                log.info("{} to be linked.".format(chosenDevice.name))
-                break
-            elif choice == len(devices)+1:
-                log.info("Returning to link menu")
-                return
-            else:
-                print("This is not a valid selection")
-                # }}}
+    while choice != 4:
 
-        # linkPrinterandFilament {{{
-        if devType.lower() == "filament":
-
-            log.info("Linking PRINTER : {0} FILAMENT : {1}".format(
-                selectedPrinter.name, chosenDevice.name))
-            selectedPrinter.filament = chosenDevice
-            chosenDevice.printer = selectedPrinter
-            # }}}
-
-        # linkPrinterandCamera {{{
-        else:
-            log.info("Linking PRINTER : {0} CAMERA : {1}".format(
-                selectedPrinter.name, chosenDevice.name))
-            selectedPrinter.camera = chosenDevice
-            chosenDevice.printer = selectedPrinter
+        # Prompt{{{
+        print("What would you like to alter?\n"
+              "1. Printer\n"
+              "2. Filament\n"
+              "3. Camera\n")
         # }}}
+
+        choice = int(input('What would you like to do : '))
+        if choice == 1:
+            log.info("Editing printer")
+            editPrinter(itemSelectionMenu(mainList[0], "Printer"))
+        elif choice == 2:
+            log.info("Editing filament spool")
+            editFilament(itemSelectionMenu(mainList[1], "Filament"))
+        elif choice == 3:
+            log.info("Editing camera")
+            editCamera(itemSelectionMenu(mainList[2], "Camera"))
+        elif choice == 4:
+            log.info("Returning to main menu")
+            return
+
+# }}}
+
+
+# editPrinter {{{
+def editPrinter(printer):
+    while choice != 6:
+        print("What property would you like to edit?\n"
+              "1. Name -> {0}\n"
+              "2. Model -> {1]}\n"
+              "3. Build Volume -> {2}\n"
+              "4. Nozzle Diameter -> {3}\n"
+              "5. Heated Build Plate -> {4}"
+              "6. Quit".format(printer.name,
+                               printer.model,
+                               printer.bldVolume,
+                               printer.nozDiam,
+                               printer.heatBldPlt))
+
+        choice = int(input('What would you like to change : '))
+        if choice == 1:
+            log.info("Editing PRINTER {} name".format(printer.name))
+            printer.name = input("New name : ")
+        elif choice == 2:
+            log.info("Editing PRINTER {} model".format(printer.name))
+            printer.model = input("New model : ")
+        elif choice == 3:
+            log.info("Editing PRINTER {} bldVolume".format(printer.name))
+            xVolume = int(input("X build volume : "))
+            yVolume = int(input("Y build volume : "))
+            zVolume = int(input("Z build volume : "))
+            printer.bldVolume = [xVolume, yVolume, zVolume]
+        elif choice == 4:
+            log.info("Editing PRINTER {} nozDiam".format(printer.name))
+            printer.nozDiam = float(input("New nozzle diameter in mm : "))
+        elif choice == 5:
+            log.info("Editing PRINTER {} heatBldPlt".format(printer.name))
+            while choice not in ('y', 'Y', 'n', 'N'):
+                choice = input('Is your build plate heated y/n : ')
+                if choice == 'y' or choice == 'Y':  # Use currently generated reports
+                    heatBldPlt = True
+                elif choice == 'n' or choice == 'N':  # Generate new reports
+                    heatBldPlt = False
+                else:
+                    print('This is not a valid selection')
+        elif choice == 6:
+            print("Quiting")
+            log.info("Returning to selection menu.")
+        else:
+            print("Not a valid selection")
+# }}}
+
+
+# editFilament {{{
+def editFilament(fil):
+    choice = None
+    while choice != 8:
+
+        # Prompt {{{
+        print("What property would you like to edit?\n"
+              "1. Name -> {0}\n"
+              "2. Maker -> {1]}\n"
+              "3. Type -> {2}\n"
+              "4. Material Diameter-> {3}\n"
+              "5. Density -> {4}"
+              "6. Remaining Filament -> {5}"
+              "7. Colour -> {6}"
+              "8. Quit".format(fil.name,
+                               fil.company,
+                               fil.mat,
+                               fil.matDia,
+                               fil.density,
+                               fil.remFil,
+                               fil.colour))
+
+        # }}}
+
+        # Options {{{
+        choice = int(input('What would you like to change : '))
+        if choice == 1:
+            log.info("Editing FILAMENT {} name".format(fil.name))
+            fil.name = input("New name : ")
+        elif choice == 2:
+            log.info("Editing FILAMENT {} maker".format(fil.name))
+            fil.company = input("New maker : ")
+        elif choice == 3:
+            log.info("Editing FILAMENT {} material type".format(fil.name))
+            fil.mat = input("New material type : ")
+        elif choice == 4:
+            log.info("Editing FILAMENT {} material diameter".format(fil.name))
+            fil.matDia = float(input("New material diameter in mm : "))
+        elif choice == 5:
+            log.info("Editing FILAMENT {} material density".format(fil.name))
+            fil.density = float(input("New material density in g/cm^3 : "))
+        elif choice == 6:
+            log.info("Editing FILAMENT {} remaining filament".format(fil.name))
+            fil.remFil = int(input("New remaining filament in g : "))
+        elif choice == 7:
+            log.info("Editing FILAMENT {} colour".format(fil.name))
+            fil.colour = input("New colour : ")
+        elif choice == 8:
+            print("Quiting")
+            log.info("Returning to selection menu.")
+        else:
+            print("Not a valid selection")
+# }}}
+
+# }}}
+
+
+# editCamera {{{
+def editCamera(cam):
+    choice = None
+    while choice != 4:
+
+        # Prompt {{{
+        print("What property would you like to edit?\n"
+              "1. Name -> {0}\n"
+              "2. Model -> {1]}\n"
+              "3. Resolution -> {2}\n"
+              "4. Quit".format(cam.name,
+                               cam.model,
+                               cam.resolution))
+
+        # }}}
+
+        # Choices {{{
+        choice = int(input('What would you like to change : '))
+        if choice == 1:
+            log.info("Editing CAMERA {} name".format(cam.name))
+            cam.name = input("New name : ")
+        elif choice == 2:
+            log.info("Editing CAMERA {} model".format(cam.name))
+            cam.name = input("New maker : ")
+        elif choice == 3:
+            log.info("Editing CAMERA {} resolution".format(cam.name))
+            xRes = int(input("X resolution : "))
+            yRes = int(input("Y resolution : "))
+            cam.resolution = [xRes, YRes]
+        elif choice == 4:
+            print("Quiting")
+            log.info("Returning to selection menu.")
+        else:
+            print("Not a valid selection")
+        # }}}
+# }}}
 
 # }}}

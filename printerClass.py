@@ -17,32 +17,42 @@ class Printer:
 
     udevRulesFile = "/etc/udev/rules.d/95-3dprinter.rules"
     addTimeout = 10  # Variable for timeout
+    baudRate = 115200
 
     # Constructor {{{
 
-    def __init__(self, name, model, bldVolume, nozDiam, heatBldPlt):  # TODO fix this for printers
+    def __init__(self, name, model, bldVolume, nozDiam, heatBldPlt):
         # User vars
         self.name = name
         self.model = model
         self.bldVolume = bldVolume  # x y z in mm
-        self.nozzleDiameter = nozDiam
-        self.heatedBuildPlate = heatBldPlt
+        self.nozDiam = nozDiam
+        self.heatBldPlt = heatBldPlt
 
         self.filament = None
         self.camera = None
-        self.port = "/dev/Printers/" + self.name
-        try:
-            pass
-            #self.serial = serial.Serial(self.port, 115200)
-        except serial.serialutil.SerialException:
-            self.newPrinterUdev()
-            #self.serial = serial.Serial(self.port, 115200)
         self.jobStart = False
         self.jobStartTime = None
         self.gcode = None
-        # self.serial.close()
         self.bedClear = True
         # }}}
+
+    # Port {{{
+    @property
+    def port(self):
+        return "/dev/Printers/{}".format(self.name)
+    # }}}
+
+    # Serial Port {{{
+    @property
+    def serial(self):
+        try:
+            return serial.Serial(self.port, Printer.baudRate)
+        except serial.serialutil.SerialException:
+            self.newPrinterUdev()
+            return serial.Serial(self.port, Printer.baudRate)
+
+    # }}}
 
     # readQRCode {{{
     def readQRCode(self):

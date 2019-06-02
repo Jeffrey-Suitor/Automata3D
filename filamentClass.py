@@ -21,6 +21,7 @@ class Filament:
     # Constructor {{{
 
     def __init__(self, name, company, mat, matDia, density, remFil, colour,):
+        # User vars
         self.name = name
         self.company = company
         self.mat = mat
@@ -28,6 +29,7 @@ class Filament:
         self.density = density  # In g/cm^3
         self.remFil = remFil  # In grams
         self.colour = colour
+
         self.printer = None
         self.date = datetime.now().strftime("%Y-%m-%d %H:%M")
         self.id = str(uuid.uuid4())

@@ -22,12 +22,13 @@ class Camera:
         self.model = model
         self.resolution = resolution
         self.printer = None
-        self.port = "/dev/Cameras/" + self.name
-        # self.newCameraUdev()
+        self.newCameraUdev()
         # }}}
 
-    # listAllAttributes {{{
-
+    # port {{{
+    @property
+    def port(self):
+        return "/dev/Cameras/{}".format(self.name)
     # }}}
 
     # addCameraPort {{{
