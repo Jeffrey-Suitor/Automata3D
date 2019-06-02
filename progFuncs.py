@@ -509,3 +509,133 @@ def editPrinter(printerList):
                 return
 
 # }}}
+
+
+# editFilament {{{
+def editFilament(filamentList):
+
+    # Check if no filaments {{{
+    if len(filamentList) == 0:  # Check if no devices
+        log.warning("There are no Filaments created yet.")
+        return
+    # }}}
+
+    while True:
+
+        # Select filament {{{
+        fil = itemSelectionMenu(filamentList)
+        if fil is None:
+            log.warning(
+                "No filament chosen returning to edit properties menu")
+            return
+        log.info("FILAMENT : {} selected to modify".format(fil.name))
+        # }}}
+
+        while True:
+
+            # Prompt {{{
+            print("1. Name -> " + fil.name + "\n"
+                  "2. Company -> " + fil.company + "\n"
+                  "3. Material -> " + fil.mat + "\n"
+                  "4. Material diameter -> " + str(fil.matDia) + "mm\n"
+                  "5. Density -> " + str(fil.density) + "g/cm^3\n"
+                  "6. Weight -> " + str(fil.weight) + "g\n"
+                  "7. Colour -> " + str(fil.colour) + "\n"
+                  "8. Quit")
+            # }}}
+
+            choice = inWrap("What property to modify : ", int, 6)
+            if choice == 1:
+                oldName = fil.name
+                fil.name = inWrap("Name : {} ->".format(fil.name))
+                log.info("{0} name changed to {1}".format(oldName, fil.name))
+            if choice == 2:
+                fil.company = inWrap("Maker : {} ->".format(fil.company))
+                log.info("{0} maker changed to {1}".format(fil.name, fil.company))
+            if choice == 3:
+                fil.mat = inWrap("Material : {} ->".format(fil.mat))
+                log.info("{0} material changed to {1}".format(fil.name, fil.mat))
+            if choice == 4:
+                fil.density = inWrap("Density : {} ->".format(fil.density), float)
+                log.info("{0} density changed to {1}".format(fil.name, fil.density))
+            if choice == 5:
+                fil.density = inWrap("Density : {} ->".format(fil.density), float)
+                log.info("{0} density changed to {1}".format(fil.name, fil.density))
+            if choice == 6:
+                print("Quiting")
+                log.info("Returning to edit properties screen")
+                return
+
+# }}}
+
+
+# editPrinter {{{
+def editPrinter(printerList):
+
+    # Check if no printers {{{
+    if len(printerList) == 0:  # Check if no devices
+        log.warning("There are no Printers created yet.")
+        return
+    # }}}
+
+    while True:
+
+        # Select printer {{{
+        prn = itemSelectionMenu(printerList)
+        if prn is None:
+            log.warning(
+                "No printer chosen returning to edit properties menu")
+            return
+        log.info("PRINTER : {} selected to modify".format(prn.name))
+        # }}}
+
+        bldVStr = 'x'.join(str(e) for e in prn.bldVolume)
+        while True:
+
+            # Prompt {{{
+            print("1. Name -> " + prn.name + "\n"
+                  "2. Model -> " + prn.model + "\n"
+                  "3. Build volume -> " + bldVStr + "\n"
+                  "4. Nozzle diameter -> " + str(prn.nozDiam) + "\n"
+                  "5. Heated build plate -> " + str(prn.heatBldPlt) + "\n"
+                  "6. Quit")
+            # }}}
+
+            choice = inWrap("What property to modify : ", int, 6)
+            if choice == 1:
+                oldName = prn.name
+                prn.name = inWrap("Name : {} ->".format(prn.name))
+                log.info("{0} name changed to {1}".format(oldName, prn.name))
+            if choice == 2:
+                prn.model = inWrap("Model : {} ->".format(prn.model))
+                log.info("{0} model changed to {1}".format(
+                    prn.name, prn.model))
+            if choice == 3:
+                xSize = inWrap("X build size in mm : ", int)
+                ySize = inWrap("Y build size in mm : ", int)
+                zSize = inWrap("Z build size in mm : ", int)
+                prn.buildVolume = [xSize, ySize, zSize]
+                bldVStr = 'x'.join(str(e) for e in prn.bldVolume)
+                log.info("{0} build size changed to {1}".format(
+                    prn.name, bldVStr))
+            if choice == 4:
+                prn.nozDiam = inWrap("Name : {} ->".format(prn.name), float)
+                log.info("{0} nozzle diameter changed to {1}".format(
+                    prn.name, prn.nozDiam))
+            if choice == 5:
+                while choice not in ('y', 'Y', 'n', 'N'):
+                    choice = input('Is your build plate heated y/n : ')
+                    if choice == 'y' or choice == 'Y':  # Use currently generated reports
+                        prn.heatBldPlt = True
+                    elif choice == 'n' or choice == 'N':  # Generate new reports
+                        prn.heatBldPlt = False
+                    else:
+                        print('This is not a valid selection')
+                log.info("{0} heated bed changed to {1}".format(
+                    prn.name, prn.heatBldPlt))
+            if choice == 6:
+                print("Quiting")
+                log.info("Returning to edit properties screen")
+                return
+
+# }}}
