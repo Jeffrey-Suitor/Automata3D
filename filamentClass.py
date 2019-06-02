@@ -6,6 +6,7 @@ import uuid
 import pyqrcode
 from PIL import Image, ImageDraw, ImageFont
 import os
+import progFuncs
 # }}}
 
 
@@ -44,35 +45,17 @@ class Filament:
         volUsed = crossSecArea * usedFil  # volUsed in cm
         gramsUsed = volUsed * self.density  # grams used
 
-        # Filament runout warning {{{
-        if self.remFil - gramsUsed < 0:
-
-            log.warning('This print will run out of filament.')
-            while choice not in ('y', 'Y', 'n', 'N'):
-                choice = input('Do you wish to proceed with the print? y/n : ')
-
-                if choice == 'y' or choice == 'Y':  # Use currently generated reports
-                    self.remFil -= gramsUsed  # Record the change
-                    log.info("YES, continue print job")
-                    return True
-
-                elif choice == 'n' or choice == 'N':  # Generate new reports
-                    log.info("NO, cancel print")
-                    return False
-
-                else:
-                    print('This is not a valid selection')
-
-                    # }}}
 
         # Filament almost out warning {{{
         elif self.remFil - gramsUsed < 3:
 
             log.warning("This print nearly run out of filament."
+                choice = progFuncs.inWrapt(
+                    'Do you wish to proceed with the print? y/n : ')
                         "There will be {0} left over"
                         .format(self.remFil - gramsUsed))
             while choice not in ('y', 'Y', 'n', 'N'):
-                choice = input('Do you wish to proceed with the print? y/n : ')
+                choice = progFuncs.inWrap('Do you wish to proceed with the print? y/n : ')
 
                 if choice == 'y' or choice == 'Y':  # Use currently generated reports
                     self.remFil -= gramsUsed  # Record the change
@@ -88,15 +71,11 @@ class Filament:
 
         # }}}
 
-        # Proceed with print {{{
-        else:
-            self.remFil -= gramsUsed  # Record the change
-            log.info("{0}g of filament remaining.".format(self.remFil))
-            return True
-        # }}}
 
     # }}}
 
+                choice = progFuncs.inWrap(
+                    'Do you wish to proceed with the print? y/n : ')
     # createQRCode {{{
     def createQRCode(self):
 
