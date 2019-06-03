@@ -4,7 +4,6 @@ import os
 import re
 import time
 from functools import partial
-from tkinter.filedialog import askopenfilename
 import PIL
 import serial
 import pyudev
@@ -28,14 +27,13 @@ class Printer:
         self.bldVolume = bldVolume  # x y z in mm
         self.nozDiam = nozDiam
         self.heatBldPlt = heatBldPlt
-        self.newPrinterUdev()
-
         self.filament = None
         self.camera = None
         self.jobStart = False
         self.jobStartTime = None
-        self.gcode = None
         self.bedClear = True
+        self.pQueue = []
+        # self.serial.close()
         # }}}
 
     # Port {{{
@@ -56,8 +54,10 @@ class Printer:
     # }}}
 
     # readQRCode {{{
+
     def readQRCode(self):
         QRimg = PIL.Image.open("cameraScanStub.jpg")
+    # }}}
         codes = pyzbar.decode(QRimg)
         # codes = pyzbar.decode(self.camera.scanForQRCode())
         for filamentID in codes:
@@ -101,14 +101,14 @@ class Printer:
     # printSTL {{{
     def printSTL(self):
 
-        # Select file and connect to printer {{{
-        input("Press enter to select your file to print.")
-        self.gcode = askopenfilename()
-        log.info(self.gcode + " has been selected to print")
-        self.serial.open()
-        # }}}
+        if len(self.pQueue) == 0:
+            log.warning("No jobs queued on {}".format(self.name))
+            return
 
-        with open(self.gcode, "r") as gcode:
+        self.serial.open()
+        job = self.pQueue[0]
+
+        with open(job, "r") as gcode:
 
             # Get ready to print {{{
             self.serial.write("\r\n\r\n".encode())
@@ -157,10 +157,16 @@ class Printer:
             self.serial.close()  # Close serial port
             self.jobStart = False  # There is no running job
             self.jobStartTime = None  # There is no job time
-            log.info(self.gcode + " has completed printing.")  # log it
-            self.gcode = None  # Remove gcode file
+            log.info(job + " has completed printing.")  # log it
+            del self.pQueue[0]
             # }}}
 
+    # }}}
+
+    # addToQueue {{{
+    def addToQueue(self, gcode):
+        self.pQueue.append(gcode)
+        log.info("{0} has been added to queue for {1}".format(gcode, self.name))
     # }}}
 
     # Remove comment {{{

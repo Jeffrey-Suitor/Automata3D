@@ -14,9 +14,17 @@ class Filament:
 
     fontPath = "/usr/share/fonts/nerd-fonts-complete/ttf/mononoki-Regular Nerd Font Complete Mono.ttf"
     qrDir = "qrCodes"
+    filamentTypeFile = "filamentTypes.txt"
+    filamentColourFile = "filamentColour.txt"
 
     if not os.path.exists(qrDir):
         os.mkdir(qrDir)
+
+    if not os.path.exists(filamentTypeFile):
+        open(filamentTypeFile, 'w+').close()
+
+    if not os.path.exists(filamentColourFile):
+        open(filamentColourFile, 'w+').close()
 
     # Constructor {{{
 

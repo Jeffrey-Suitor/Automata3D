@@ -7,6 +7,7 @@ from printerClass import Printer
 from cameraClass import Camera
 from datetime import datetime
 import pickle
+from tkinter.filedialog import askopenfilename
 # }}}
 
 
@@ -73,15 +74,21 @@ def createPrinter(printerList):
 
 # createFilament {{{
 def createFilament(filamentList):
+    with open(Filament.filamentTypeFile, "r+") as f:
+        typeList = f.readlines()
+    with open(Filament.filamentColourFile, "r+") as f:
+        colourList = f.readlines()
 
     # Prompt {{{
     name = inWrap("What is the name of this filament : ")
     company = inWrap("Who makes this filament : ")
-    mat = inWrap("What type of material is this filament : ")
+    print("What type of material is this filament")
+    mat = itemSelectionMenu(typeList, Filament.filamentTypeFile)
     matDia = inWrap("What is the diameter of this filament in mm : ", float)
     dense = inWrap("What is the density of the filament in g/cm^3 : ", float)
     weight = inWrap("What is the weight of this filament in g : ", int)
-    colour = inWrap("What colour is this filament : ")
+    print("What colour is this filament")
+    colour = itemSelectionMenu(colourList, Filament.filamentColourFile)
     # }}}
 
     # logFile {{{
@@ -231,6 +238,75 @@ def checkDatabase(databaseFile):
 # }}}
 
 
+# addFile {{{
+def addFile(databaseFile, mainList):
+
+    # Setup {{{
+    with open(Filament.filamentTypeFile, "r+") as f:
+        typeList = f.readlines()
+    with open(Filament.filamentColourFile, "r+") as f:
+        colourList = f.readlines()
+    propMat = []
+    finalOptions = []
+    # }}}
+
+    # User Input {{{
+    print("Please select your print")
+    newFile = askopenfilename()
+    print("Please select your material type and colour.\n"
+          "If you do not see your choice here it is because there is no filament that exists with those attributes.\n")
+    # }}}
+
+    # Check Material Type {{{
+    while True:
+        print("What type of material is your print")
+        matType = itemSelectionMenu(typeList, "Filament")
+        if matType is None:
+            log.warning("File addition canceled")
+            return
+        for i in range(len(mainList[0])):
+            try:
+                if mainList[0][i].filament.mat == matType:
+                    propMat.append(mainList[0][i])
+            except AttributeError:
+                log.warning("PRINTER : {} is not linked to a filament.".format(mainList[0][i].name))
+        if len(propMat) == 0:
+            log.warning("No printer found with spool of type {}. Please link and add this filament to printer.".format(matType))
+        else:
+            break
+
+        # }}}
+
+    # Check Material Colour {{{
+    while True:
+        print('What colour is your print')
+        matColour = itemSelectionMenu(colourList, "Filament")
+        if matColour is None:
+            log.warning("File addition canceled")
+            return
+        for i in range(len(mainList[0])):
+            if mainList[0][i].filament.colour == matColour:
+                finalOptions.append(mainList[0][i])
+        if len(finalOptions) == 0:
+            log.warning("No {0} {1} filament is currently loaded.".format(matType, matColour))
+        else:
+            break
+
+        # }}}
+
+    printer = itemSelectionMenu(finalOptions, "Queue")
+    if printer is not None:
+        printer.addToQueue(newFile)
+
+        with open(databaseFile, "wb") as f:
+            pickle.dump(mainList, f)
+        return
+    else:
+        log.warning("File addition canceled")
+        return
+#}}}
+
+
 # mainMenu{{{
 def mainMenu(databaseFile):
 
@@ -240,12 +316,12 @@ def mainMenu(databaseFile):
     mainList = checkDatabase(databaseFile)
     print(mainList)
     # }}}
-    print(os.geteuid())
+
     while True:
         # Prompt {{{
         print("\n\nAutomata3d : Printer Management Software\n\n\n"
               "Please select the number next to the option you would like\n\n"
-              "1. Begin print job\n"
+              "1. Add print job\n"
               "2. View printer status\n"
               "3. Edit properties\n"
               "4. View cameras\n"
@@ -256,7 +332,12 @@ def mainMenu(databaseFile):
         # }}}
         choice = inWrap('What would you like to do : ', int, 8)
         if choice == 1:
-            print("Start print")
+            #TODO: Set all printers up to queue up jobs and start working on them automatically
+            if os.geteuid() !=0:
+                log.warning("You must be root to add files. Escalating permissions.")
+                toggleRoot()
+            log.info("Adding file")
+            addFile(databaseFile, mainList)
         elif choice == 2:
             print("Select your printer")
         elif choice == 3:
@@ -298,6 +379,7 @@ def mainMenu(databaseFile):
 # }}}
 
 
+# Delete Devices {{{
 # deleteMenu {{{
 def deleteMenu(databaseFile, mainList):
 
@@ -362,6 +444,8 @@ def delUdev(chosenDev):
             f.truncate()
 # }}}
 
+# }}}
+
 
 # confirmationPrompt {{{
 def confirmationPrompt():
@@ -404,32 +488,118 @@ def checkCamerasMenu(mainList):
 
 
 # itemSelectionMenu {{{
-def itemSelectionMenu(itemList):
+def itemSelectionMenu(itemList, specialList=None):
     choice = None
     index = 0
-    while choice != len(itemList)+1:  # as long as user doesnt quit
 
-        # Prompt {{{
-        while index != len(itemList):  # print entire dev list
-            print("{0}. {1}".format(index+1, itemList[index].name))
-            index +=1
-        print("{}. Quit".format(index+1))  # print quit
-        # }}}
+    # NormalList {{{
+    if specialList is None:
+        while choice != len(itemList)+1:  # as long as user doesnt quit
 
-        choice = inWrap("Select the item number: ", int)
-        if 0 < choice <= len(itemList):  # if the user selects a device
-            selectedItem = itemList[choice-1]
-            log.info("{} to be linked.".format(selectedItem.name))
-            return selectedItem
-        elif choice == len(itemList)+1:
-            log.info("Leaving selection menu")
-            return
-        else:
-            print("This is not a valid selection")
+            # Prompt {{{
+            while index != len(itemList):  # print entire dev list
+                print("{0}. {1}".format(index+1, itemList[index].name))
+                index +=1
+            print("{}. Quit".format(index+1))  # print quit
+            # }}}
+
+            choice = inWrap("Select the item number: ", int)
+            if 0 < choice <= len(itemList):  # if the user selects a device
+                selectedItem = itemList[choice-1]
+                log.info("{} to be linked.".format(selectedItem.name))
+                return selectedItem
+            elif choice == len(itemList)+1:
+                log.info("Leaving selection menu")
+                return
+            else:
+                print("This is not a valid selection")
+
+                # }}}
+
+    # Printer Queue {{{
+    elif specialList == "Queue":
+        while choice != len(itemList)+1:  # as long as user doesnt quit
+
+            # Prompt {{{
+            while index != len(itemList):  # print entire dev list
+                print("{0}. {1} -> {2}".format(index+1, itemList[index].name, len(itemList[index].pQueue)))
+                index +=1
+            print("{}. Quit".format(index+1))  # print quit
+            # }}}
+
+            choice = inWrap("Select the item number: ", int)
+            if 0 < choice <= len(itemList):  # if the user selects a device
+                selectedItem = itemList[choice-1]
+                return selectedItem
+            elif choice == len(itemList)+1:
+                log.info("Leaving selection menu")
+                return
+            else:
+                print("This is not a valid selection")
+
+                # }}}
+
+    # Filament Select {{{
+    elif specialList == "Filament":
+        while choice != len(itemList)+1:  # as long as user doesnt quit
+
+            # Prompt {{{
+            while index != len(itemList):  # print entire dev list
+                print("{0}. {1}".format(index+1, itemList[index]))
+                index +=1
+            print("{}. Quit".format(index+1))  # print quit
+            # }}}
+
+            choice = inWrap("Select the item number: ", int)
+            if 0 < choice <= len(itemList):  # if the user selects a device
+                selectedItem = itemList[choice-1]
+                log.info("{} to be linked.".format(selectedItem))
+                return selectedItem
+            elif choice == len(itemList)+1:
+                log.info("Leaving selection menu")
+                return
+            else:
+                print("This is not a valid selection")
+
+                # }}}
+
+    # Filament Creation {{{
+    else:
+        while choice != len(itemList)+1:  # as long as user doesnt quit
+
+            # Prompt {{{
+            while index != len(itemList):  # print entire dev list
+                print("{0}. {1}".format(index+1, itemList[index]))
+                index +=1
+            print("{}. Custom value".format(index+1))
+            print("{}. Quit".format(index+2))  # print quit
+            # }}}
+
+            choice = inWrap("Select the item number: ", int)
+            if 0 < choice <= len(itemList):  # if the user selects a device
+                selectedItem = itemList[choice-1]
+                log.info("{} to be selected.".format(selectedItem))
+                return selectedItem
+            elif choice == len(itemList)+1:
+                selectedItem = inWrap("What is the name of your new entry : ")
+                log.info("New filament entry added : {}.".format(selectedItem))
+                with open(specialList, "a+") as f:
+                    f.write(selectedItem)
+                return selectedItem
+            elif choice == len(itemList)+2:
+                log.info("Leaving selection menu")
+                return
+            else:
+                print("This is not a valid selection")
+
+                # }}}
+
 # }}}
 
 
 # Edit Properties {{{
+
+
 # editPropertiesMenu {{{
 def editPropertiesMenu(databaseFile, mainList):
     while True:
@@ -545,6 +715,11 @@ def editPrinter(printerList):
 # editFilament {{{
 def editFilament(filamentList):
 
+    with open(Filament.filamentTypeFile, "r+") as f:
+        typeList = f.readlines()
+    with open(Filament.filamentColourFile, "r+") as f:
+        colourList = f.readlines()
+
     # Check if no filaments {{{
     if len(filamentList) == 0:  # Check if no devices
         log.warning("There are no Filaments created yet.")
@@ -584,7 +759,7 @@ def editFilament(filamentList):
                 fil.company = inWrap("Maker : {} -> ".format(fil.company))
                 log.info("{0} maker changed to {1}".format(fil.name, fil.company))
             if choice == 3:
-                fil.mat = inWrap("Material : {} -> ".format(fil.mat))
+                fil.mat = itemSelectionMenu(typeList, Filament.filamentTypeFile)
                 log.info("{0} material changed to {1}".format(fil.name, fil.mat))
             if choice == 4:
                 fil.matDia = inWrap("Material diameter : {} -> ".format(fil.matDia), float)
@@ -596,7 +771,7 @@ def editFilament(filamentList):
                 fil.remFil = inWrap("Remaining filament : {}g -> ".format(fil.remFil), int)
                 log.info("{0} remaining filament changed to {1}".format(fil.name, fil.remFil))
             if choice == 7:
-                fil.colour = inWrap("Colour : {} -> ".format(fil.colour))
+                fil.colour = itemSelectionMenu(colourList, Filament.filamentColourFile)
                 log.info("{0} colour changed to {1}".format(fil.name, fil.colour))
             if choice == 8:
                 print("Are all changes complete")
