@@ -16,7 +16,7 @@ log.basicConfig(level=log.INFO)
 databaseFile = "Database.pkl"
 # }}}
 
-progFuncs.changeToRoot()
+# progFuncs.changeToRoot()
 progFuncs.mainMenu(databaseFile)
 
 # printer = Printer("Main", "CR10", [300, 300, 400], 0.4, True)

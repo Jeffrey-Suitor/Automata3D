@@ -14,13 +14,13 @@ import pickle
 def inWrap(message, inType=str, numCheck=None):
     while True:
         try:
+            userInput = (inType(input(message)))
             if numCheck is not None:
-                if inType(input(message)) < 1 or inType(input(message)) > numCheck:
+                if userInput < 1 or userInput > numCheck:
                     raise ValueError
-            return inType(input(message))
+            return userInput
         except ValueError:
-            log.warning(
-                "Invalid selection. Input should be a {}".format(inType.__name__))
+            log.warning("Invalid selection. Input should be a {}".format(inType.__name__))
 # }}}
 
 
@@ -73,7 +73,6 @@ def createPrinter(printerList):
 
 # createFilament {{{
 def createFilament(filamentList):
-    choice = None
 
     # Prompt {{{
     name = inWrap("What is the name of this filament : ")
@@ -176,7 +175,7 @@ def linkMenu(printers, devices, devType):
         log.warning("No Printer selected return to add device menu")
         return
     print("What {} would you like to link.".format(devType))
-    chosenDevice = itemSelectionMenu(printers)
+    chosenDevice = itemSelectionMenu(devices)
     if chosenDevice is None:
         log.warning("No {} selected. Leaving link menu".format(devType))
         return
@@ -204,9 +203,15 @@ def linkMenu(printers, devices, devType):
 
 
 # changeToRoot {{{
-def changeToRoot():
+def toggleRoot():
     if os.geteuid() != 0:
+        log.info("Resigning in as sudo")
         os.execvp("sudo", ["sudo", "python3"] + sys.argv)
+    if os.geteuid() == 0:
+        sudoID = int(os.getenv("SUDO_UID"))
+        os.seteuid(sudoID)
+        os.execvp("python3", ["python3"] + sys.argv)
+        log.info("Resigning in as regular user")
 # }}}
 
 
@@ -234,38 +239,54 @@ def mainMenu(databaseFile):
     log.info('New session started : {}'.format(currentTime))
     mainList = checkDatabase(databaseFile)
     print(mainList)
-    choice = None
     # }}}
-
+    print(os.geteuid())
     while True:
         # Prompt {{{
         print("\n\nAutomata3d : Printer Management Software\n\n\n"
               "Please select the number next to the option you would like\n\n"
               "1. Begin print job\n"
               "2. View printer status\n"
-              "3. Access filament library\n"
+              "3. Edit properties\n"
               "4. View cameras\n"
               "5. Add a new printer / filament / camera\n"
-              "6. Remove printer /filament / camera\n"
-              "7. Exit\n")
+              "6. Remove printer / filament / camera\n"
+              "7. Toggle root status\n"
+              "8. Exit\n")
         # }}}
-        choice = inWrap('What would you like to do : ', int, 7)
+        choice = inWrap('What would you like to do : ', int, 8)
         if choice == 1:
             print("Start print")
         elif choice == 2:
             print("Select your printer")
         elif choice == 3:
-            print("Access filament library")
+            if os.geteuid() !=0:
+                log.warning("Cannot edit devices as non root user. Escalating permissions.")
+                toggleRoot()
+            log.info("Accessing edit properties menu")
+            editPropertiesMenu(databaseFile, mainList)
         elif choice == 4:
+            if os.geteuid() ==0:
+                log.warning("Cameras not accessible as root. Descalating permssions.")
+                toggleRoot()
             log.info("Viewing cameras")
             checkCamerasMenu(mainList)
         elif choice == 5:
+            if os.geteuid() !=0:
+                log.warning("Cannot create devices as non root user. Escalating permissions.")
+                toggleRoot()
             log.info("Accessing device creation menu")
             addDeviceMenu(databaseFile, mainList)
         elif choice == 6:
-            log.info("Device deletion menu")
+            if os.geteuid() !=0:
+                log.warning("Cannot deletedevices as non root user. Escalating permissions.")
+                toggleRoot()
+            log.info("Resigning in as sudo")
             deleteMenu(databaseFile, mainList)
         elif choice == 7:
+            log.info("Toggling root status")
+            toggleRoot()
+        elif choice == 8:
             # Close program {{{
             print("Have a great day.")
             with open(databaseFile, "wb") as f:
@@ -312,7 +333,6 @@ def deleteMenu(databaseFile, mainList):
 
 # deleteDevice {{{
 def deleteDevice(devList, devType):
-    choice = None
     if len(devList) == 0:  # Check if no devices
         log.warning("There are no {}s created yet.".format(devType))
         return
@@ -323,10 +343,10 @@ def deleteDevice(devList, devType):
             log.warning("No device chosen returning to delete device menu")
             return
         if confirmationPrompt():  # Confirm the user choice
-            log.info("Removing {}".format(devList[choice-1].name))
+            log.info("Removing {}".format(chosenDev.name))
             if devType.lower() == "printer" or devType.lower() == "camera":
                 delUdev(chosenDev)
-            del chosenDev  # Delete the device
+            devList.remove(chosenDev)  # Delete the device
         else:
             log.info("Choice canceled")
     # }}}
@@ -386,12 +406,14 @@ def checkCamerasMenu(mainList):
 # itemSelectionMenu {{{
 def itemSelectionMenu(itemList):
     choice = None
+    index = 0
     while choice != len(itemList)+1:  # as long as user doesnt quit
 
         # Prompt {{{
-        for i in range(len(itemList)):  # print entire dev list
-            print("{0}. {1}".format(i+1, itemList[i].name))
-        print("{}. Quit".format(i+2))  # print quit
+        while index != len(itemList):  # print entire dev list
+            print("{0}. {1}".format(index+1, itemList[index].name))
+            index +=1
+        print("{}. Quit".format(index+1))  # print quit
         # }}}
 
         choice = inWrap("Select the item number: ", int)
@@ -407,8 +429,9 @@ def itemSelectionMenu(itemList):
 # }}}
 
 
+# Edit Properties {{{
 # editPropertiesMenu {{{
-def editPropertiesMenu(mainList):
+def editPropertiesMenu(databaseFile, mainList):
     while True:
 
         # Prompt {{{
@@ -422,19 +445,19 @@ def editPropertiesMenu(mainList):
         choice = inWrap('What would you like to do : ', int, 4)
         if choice == 1:
             log.info("Editing printer")
-            editPrinter(mainList[0], "Printer")
+            saveChanges = editPrinter(mainList[0])
         if choice == 2:
             log.info("Editing filament spool")
-            editFilament(mainList[1], "Filament")
+            saveChanges = editFilament(mainList[1])
         if choice == 3:
             log.info("Editing camera")
-            editCamera(mainList[2], "Camera")
+            saveChanges = editCamera(mainList[2])
         if choice == 4:
             log.info("Returning to main menu")
             return
-
-        with open(databaseFile, "wb") as f:
-            pickle.dump(mainList, f)
+        if saveChanges:
+            with open(databaseFile, "wb") as f:
+                pickle.dump(mainList, f)
 
 # }}}
 
@@ -474,22 +497,23 @@ def editPrinter(printerList):
             choice = inWrap("What property to modify : ", int, 6)
             if choice == 1:
                 oldName = prn.name
-                prn.name = inWrap("Name : {} ->".format(prn.name))
+                prn.name = inWrap("Name : {} -> ".format(prn.name))
                 log.info("{0} name changed to {1}".format(oldName, prn.name))
             if choice == 2:
-                prn.model = inWrap("Model : {} ->".format(prn.model))
+                prn.model = inWrap("Model : {} -> ".format(prn.model))
                 log.info("{0} model changed to {1}".format(
                     prn.name, prn.model))
             if choice == 3:
+                print(bldVStr)
                 xSize = inWrap("X build size in mm : ", int)
                 ySize = inWrap("Y build size in mm : ", int)
                 zSize = inWrap("Z build size in mm : ", int)
-                prn.buildVolume = [xSize, ySize, zSize]
+                prn.bldVolume = [xSize, ySize, zSize]
                 bldVStr = 'x'.join(str(e) for e in prn.bldVolume)
                 log.info("{0} build size changed to {1}".format(
                     prn.name, bldVStr))
             if choice == 4:
-                prn.nozDiam = inWrap("Name : {} ->".format(prn.name), float)
+                prn.nozDiam = inWrap("Name : {} -> ".format(prn.name), float)
                 log.info("{0} nozzle diameter changed to {1}".format(
                     prn.name, prn.nozDiam))
             if choice == 5:
@@ -504,9 +528,16 @@ def editPrinter(printerList):
                 log.info("{0} heated bed changed to {1}".format(
                     prn.name, prn.heatBldPlt))
             if choice == 6:
-                print("Quiting")
-                log.info("Returning to edit properties screen")
-                return
+                print("Are all changes complete")
+                if confirmationPrompt():
+                    print("Would you like to save your changes")
+                    if confirmationPrompt():
+                        log.info("Saving changes and returning to edit properties screen")
+                        return True
+                    else:
+                        log.warning("Changes not saved")
+                        return False
+
 
 # }}}
 
@@ -539,7 +570,7 @@ def editFilament(filamentList):
                   "3. Material -> " + fil.mat + "\n"
                   "4. Material diameter -> " + str(fil.matDia) + "mm\n"
                   "5. Density -> " + str(fil.density) + "g/cm^3\n"
-                  "6. Weight -> " + str(fil.weight) + "g\n"
+                  "6. Remaining Filament -> " + str(fil.remFil) + "g\n"
                   "7. Colour -> " + str(fil.colour) + "\n"
                   "8. Quit")
             # }}}
@@ -557,20 +588,26 @@ def editFilament(filamentList):
                 log.info("{0} material changed to {1}".format(fil.name, fil.mat))
             if choice == 4:
                 fil.matDia = inWrap("Material diameter : {} -> ".format(fil.matDia), float)
-                log.info("{0} material diamter changed to {1}".format(fil.name, fil.density))
+                log.info("{0} material diamter changed to {1}".format(fil.name, fil.matDia))
             if choice == 5:
                 fil.density = inWrap("Density : {} -> ".format(fil.density), float)
                 log.info("{0} density changed to {1}".format(fil.name, fil.density))
             if choice == 6:
-                fil.remFil = inWrap("Remaining filament : {}g -> ".format(fil.weight), int)
-                log.info("{0} remaining filament changed to {1}".format(fil.name, fil.density))
+                fil.remFil = inWrap("Remaining filament : {}g -> ".format(fil.remFil), int)
+                log.info("{0} remaining filament changed to {1}".format(fil.name, fil.remFil))
             if choice == 7:
-                fil.colour = inWrap("Colour : {} ->".format(fil.colour))
+                fil.colour = inWrap("Colour : {} -> ".format(fil.colour))
                 log.info("{0} colour changed to {1}".format(fil.name, fil.colour))
             if choice == 8:
-                print("Quiting")
-                log.info("Returning to edit properties screen")
-                return
+                print("Are all changes complete")
+                if confirmationPrompt():
+                    print("Would you like to save your changes")
+                    if confirmationPrompt():
+                        log.info("Saving changes and returning to edit properties screen")
+                        return True
+                    else:
+                        log.warning("Changes not saved")
+                        return False
 
 # }}}
 
@@ -607,10 +644,10 @@ def editCamera(cameraList):
             choice = inWrap("What property to modify : ", int, 4)
             if choice == 1:
                 oldName = cam.name
-                cam.name = inWrap("Name : {} ->".format(cam.name))
+                cam.name = inWrap("Name : {} -> ".format(cam.name))
                 log.info("{0} name changed to {1}".format(oldName, cam.name))
             if choice == 2:
-                cam.model = inWrap("Model : {} ->".format(cam.model))
+                cam.model = inWrap("Model : {} -> ".format(cam.model))
                 log.info("{0} model changed to {1}".format(
                     cam.name, cam.model))
             if choice == 3:
@@ -620,8 +657,16 @@ def editCamera(cameraList):
                 res = 'x'.join(str(e) for e in cam.resolution)
                 log.info("{0} resolution changed to {1}".format(cam.name, res))
             if choice == 4:
-                print("Quiting")
-                log.info("Returning to edit properties screen")
-                return
+                print("Are all changes complete")
+                if confirmationPrompt():
+                    print("Would you like to save your changes")
+                    if confirmationPrompt():
+                        log.info("Saving changes and returning to edit properties screen")
+                        return True
+                    else:
+                        log.warning("Changes not saved")
+                        return False
+
+# }}}
 
 # }}}

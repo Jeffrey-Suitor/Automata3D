@@ -28,6 +28,7 @@ class Printer:
         self.bldVolume = bldVolume  # x y z in mm
         self.nozDiam = nozDiam
         self.heatBldPlt = heatBldPlt
+        self.newPrinterUdev()
 
         self.filament = None
         self.camera = None
