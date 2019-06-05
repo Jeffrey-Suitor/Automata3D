@@ -321,53 +321,60 @@ def mainMenu(databaseFile):
         # Prompt {{{
         print("\n\nAutomata3d : Printer Management Software\n\n\n"
               "Please select the number next to the option you would like\n\n"
-              "1. Add print job\n"
-              "2. View printer status\n"
-              "3. Edit properties\n"
-              "4. View cameras\n"
-              "5. Add a new printer / filament / camera\n"
-              "6. Remove printer / filament / camera\n"
-              "7. Toggle root status\n"
-              "8. Exit\n")
+              "1. Start prints\n"
+              "2. Add print job\n"
+              "3. View printer status\n"
+              "4. Edit properties\n"
+              "5. View cameras\n"
+              "6. Add a new printer / filament / camera\n"
+              "7. Remove printer / filament / camera\n"
+              "8. Toggle root status\n"
+              "9. Exit\n")
         # }}}
-        choice = inWrap('What would you like to do : ', int, 8)
+
+        choice = inWrap('What would you like to do : ', int, 9)
         if choice == 1:
-            #TODO: Set all printers up to queue up jobs and start working on them automatically
+            for i in range(len(mainList[0])):
+                if not mainList[0][i].jobStart and mainList[0][i].bedClear:
+                    log.info("Starting Printer {}".format(mainList[0][i].name))
+                    mainList[0][i].printSTL()
+        elif choice == 2:
             if os.geteuid() !=0:
                 log.warning("You must be root to add files. Escalating permissions.")
                 toggleRoot()
             log.info("Adding file")
             addFile(databaseFile, mainList)
-        elif choice == 2:
-            print("Select your printer")
         elif choice == 3:
+            log.info("Viewing status")
+            viewPrinterMenu(mainList)
+        elif choice == 4:
             if os.geteuid() !=0:
                 log.warning("Cannot edit devices as non root user. Escalating permissions.")
                 toggleRoot()
             log.info("Accessing edit properties menu")
             editPropertiesMenu(databaseFile, mainList)
-        elif choice == 4:
+        elif choice == 5:
             if os.geteuid() ==0:
                 log.warning("Cameras not accessible as root. Descalating permssions.")
                 toggleRoot()
             log.info("Viewing cameras")
             checkCamerasMenu(mainList)
-        elif choice == 5:
+        elif choice == 6:
             if os.geteuid() !=0:
                 log.warning("Cannot create devices as non root user. Escalating permissions.")
                 toggleRoot()
             log.info("Accessing device creation menu")
             addDeviceMenu(databaseFile, mainList)
-        elif choice == 6:
+        elif choice == 7:
             if os.geteuid() !=0:
                 log.warning("Cannot deletedevices as non root user. Escalating permissions.")
                 toggleRoot()
             log.info("Resigning in as sudo")
             deleteMenu(databaseFile, mainList)
-        elif choice == 7:
+        elif choice == 8:
             log.info("Toggling root status")
             toggleRoot()
-        elif choice == 8:
+        elif choice == 9:
             # Close program {{{
             print("Have a great day.")
             with open(databaseFile, "wb") as f:
@@ -436,12 +443,16 @@ def deleteDevice(devList, devType):
 
 # delUdev {{{
 def delUdev(chosenDev):
-    with open(chosenDev.udevRulesFile, "r+") as f:
-        file = f.readlines()
-        for line in file:
-            if chosenDev.name not in line:
-                f.write(line)
-            f.truncate()
+    try:
+        with open(chosenDev.udevRulesFile, "r+") as f:
+            file = f.readlines()
+            for line in file:
+                if chosenDev.name not in line:
+                    f.write(line)
+                f.truncate()
+    except FileNotFoundError:
+        log.warning("No udev file found skipping")
+
 # }}}
 
 # }}}
@@ -843,5 +854,33 @@ def editCamera(cameraList):
                         return False
 
 # }}}
+
+# }}}
+
+
+# viewPrinterMenu {{{
+def viewPrinterMenu(mainList):
+    while True:
+
+        # Prompt {{{
+        print("\n\nWhat would you like to do?\n\n\n"
+              "1. View printer status\n"
+              "2. Send commands\n"
+              "3. Return to main menu\n")
+        # }}}
+
+        choice = inWrap('What would you like to do : ', int, 3)
+        if choice == 1:
+            printer = itemSelectionMenu(mainList[0])
+            log.info("Editing PRINTER {}".format(printer.name))
+            printer.printInfo()
+        if choice == 2:
+            printer = itemSelectionMenu(mainList[0])
+            log.info("Sending commands to printer {}".format(printer.name))
+            printer.sendCommands()
+            saveChanges = editFilament(mainList[1])
+        if choice == 3:
+            log.info("Returning to main menu")
+            return
 
 # }}}

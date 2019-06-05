@@ -33,31 +33,19 @@ class Printer:
         self.jobStartTime = None
         self.bedClear = True
         self.pQueue = []
-        # self.serial.close()
-        # }}}
-
-    # Port {{{
-    @property
-    def port(self):
-        return "/dev/Printers/{}".format(self.name)
-    # }}}
-
-    # Serial Port {{{
-    @property
-    def serial(self):
+        self.port = "/dev/Printers/{}".format(self.name)
         try:
-            return serial.Serial(self.port, Printer.baudRate)
+            self.serial = serial.Serial(self.port, Printer.baudRate)
         except serial.serialutil.SerialException:
             self.newPrinterUdev()
-            return serial.Serial(self.port, Printer.baudRate)
-
-    # }}}
+            self.serial = serial.Serial(self.port, Printer.baudRate)
+        self.serial.close()
+        # }}}
 
     # readQRCode {{{
 
     def readQRCode(self):
         QRimg = PIL.Image.open("cameraScanStub.jpg")
-    # }}}
         codes = pyzbar.decode(QRimg)
         # codes = pyzbar.decode(self.camera.scanForQRCode())
         for filamentID in codes:
@@ -137,11 +125,15 @@ class Printer:
                     command = self.removeComment(line)
                     command = command.strip()  # Strip all EOL characters for streaming
                     if (command.isspace() is False and len(command) > 0):
+                        if "M190" in line:
+                            print("Found it")
+
                         log.info("Sending: " + command)
                         self.serial.write((command + '\n').encode())
+                        self.serial.flush()
                         # Wait for response with carriage return
-                        grbl_out = self.serial.readline()
-                        print(' : ' + str(grbl_out.strip()))
+                        grbl_out = self.serial.readline().decode().split("B")
+                        print(grbl_out)
                 # }}}
 
                 # Canceled print job {{{
@@ -211,7 +203,7 @@ class Printer:
         newDevice = Printer.addPrinterPort()
         ruleAlreadyExists = False
         # Udev rule to write {{{
-        udevRule = 'SUBSYSTEM == "' + newDevice.subsystem + '", ' \
+        udevRule = 'SUBSYSTEM == "tty",' \
             'ATTRS{idVendor} == "' + str(newDevice.get('ID_VENDOR_ID')) + '", ' \
             'ATTRS{idProduct} == "' + newDevice.get('ID_MODEL_ID') + '", ' \
             'SYMLINK += "Printers/' + str(self.name) + '"\n'
@@ -233,5 +225,24 @@ class Printer:
         time.sleep(2)
 
     # }}}
+
+    # printInfo {{{
+    def printInfo(self):
+
+        bldVStr = 'x'.join(str(e) for e in self.bldVolume)
+        print("\nName : {}".format(self.name))
+        print("Model : {}".format(self.model))
+        print("Build Volume : {}mm".format(bldVStr))
+        print("Nozzle diameter : {}mm".format(self.nozDiam))
+        print("Heated Build Plate : {}".format(self.heatBldPlt))
+        print("Filament Name : {}".format(self.filament))
+        print("Camera Name : {}".format(self.camera))
+        print("Job Running : {}".format(self.jobStart))
+        print("Job Start Time : {}".format(self.jobStartTime))
+        print("Bed Clear : {}".format(self.bedClear))
+        for i in range(len(self.pQueue)):
+            print("Job {0} : {1}".format(i, self.pQueue[i]))
+
+    #}}}
 
 # }}}

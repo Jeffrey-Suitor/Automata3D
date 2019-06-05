@@ -48,7 +48,7 @@ class Filament:
 
         choice = None
         usedFil = usedFil*100  # convert to cm from m
-        crossSecArea = (self.matDia/10/2)**2 * math.pi()  # /10 for mm to cm
+        crossSecArea = (self.matDia/10/2)**2 * math.pi  # /10 for mm to cm
         volUsed = crossSecArea * usedFil  # volUsed in cm
         gramsUsed = volUsed * self.density  # grams used
 
