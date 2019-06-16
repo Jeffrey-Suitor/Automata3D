@@ -296,7 +296,8 @@ def addFile(databaseFile, mainList):
 
     printer = itemSelectionMenu(finalOptions, "Queue")
     if printer is not None:
-        printer.addToQueue(newFile)
+        print(newFile.split("/")[-1].split(".")[0])
+        printer.addToQueue(newFile.split("/")[-1].split(".")[0], newFile)
 
         with open(databaseFile, "wb") as f:
             pickle.dump(mainList, f)
@@ -337,7 +338,7 @@ def mainMenu(databaseFile):
             for i in range(len(mainList[0])):
                 if not mainList[0][i].jobStart and mainList[0][i].bedClear:
                     log.info("Starting Printer {}".format(mainList[0][i].name))
-                    mainList[0][i].printSTL()
+                    mainList[0][i].recordToSD()
         elif choice == 2:
             if os.geteuid() !=0:
                 log.warning("You must be root to add files. Escalating permissions.")

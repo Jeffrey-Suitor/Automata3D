@@ -66,6 +66,7 @@ class Printer:
 
         # Command loop {{{
         while True:
+            commandResponse = None
             print("Please input the command you would like to send. To quit send Q")
             command = input("Command: ")
 
@@ -79,24 +80,20 @@ class Printer:
             log.info(self.name + " Sending: " + command)
             self.serial.write((command + '\n').encode())  # Send g-code block
             # Wait for response with carriage return
-            grbl_out = self.serial.readline()
-            print(' : ' + str(grbl_out.strip()))
-
+            while commandResponse != "ok":
+                grbl_out = self.serial.readline()
+                commandResponse = grbl_out.strip().decode("utf-8")
+                print(commandResponse)
         # }}}
 
     # }}}
 
-    # printSTL {{{
-    def printSTL(self):
-
-        if len(self.pQueue) == 0:
-            log.warning("No jobs queued on {}".format(self.name))
-            return
+    # recordToSD {{{
+    def recordToSD(self, filename, gcodeFile):
 
         self.serial.open()
-        job = self.pQueue[0]
 
-        with open(job, "r") as gcode:
+        with open(gcodeFile, "r") as gcode:
 
             # Get ready to print {{{
             self.serial.write("\r\n\r\n".encode())
@@ -118,22 +115,22 @@ class Printer:
             if self.jobStart:  # If the job is approved
                 self.bedClear = False  # The bed is no longer clear
                 self.jobStartTime = time.time()  # The job start time
+                self.serial.write(('M21 \n').encode())
+                self.serial.write('M28 {}.gco\n'.format(filename).encode())
+                log.info("Started writing {}.gco".format(filename))
 
                 # Print the file {{{
                 for line in gcode:
                     # Run the remove comment function
+                    commandComplete = False
                     command = self.removeComment(line)
                     command = command.strip()  # Strip all EOL characters for streaming
                     if (command.isspace() is False and len(command) > 0):
-                        if "M190" in line:
-                            print("Found it")
-
-                        log.info("Sending: " + command)
+                        log.info("Writing: " + command)
                         self.serial.write((command + '\n').encode())
                         self.serial.flush()
-                        # Wait for response with carriage return
-                        grbl_out = self.serial.readline().decode().split("B")
-                        print(grbl_out)
+                self.serial.write('M29 {}.gco\n'.format(filename).encode())
+                log.info("Finished writing {}.gco".format(filename))
                 # }}}
 
                 # Canceled print job {{{
@@ -145,20 +142,19 @@ class Printer:
                 # }}}
 
             # Finished Printing {{{
-            input("  Press <Enter> to exit.")
             self.serial.close()  # Close serial port
             self.jobStart = False  # There is no running job
             self.jobStartTime = None  # There is no job time
-            log.info(job + " has completed printing.")  # log it
-            del self.pQueue[0]
             # }}}
 
     # }}}
 
     # addToQueue {{{
-    def addToQueue(self, gcode):
-        self.pQueue.append(gcode)
-        log.info("{0} has been added to queue for {1}".format(gcode, self.name))
+    def addToQueue(self, filename, gcode):
+        self.pQueue.append(filename)
+        log.info("{0} has been added to queue for {1}".format(filename, self.name))
+        self.recordToSD(filename, gcode)
+
     # }}}
 
     # Remove comment {{{
@@ -244,5 +240,13 @@ class Printer:
             print("Job {0} : {1}".format(i, self.pQueue[i]))
 
     #}}}
+
+    # monitorPrinter {{{
+    def monitorPrinter(self):
+        while True:
+            grbl_out = self.serial.readline()
+            commandResponse = grbl_out.strip().decode("utf-8")
+            print(commandResponse)
+    # }}}
 
 # }}}
