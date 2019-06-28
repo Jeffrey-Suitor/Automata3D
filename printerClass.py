@@ -4,10 +4,14 @@ import os
 import re
 import time
 from functools import partial
+
 import PIL
-import serial
 import pyudev
+import serial
 from pyzbar import pyzbar
+
+import numberToString as NTS
+
 # }}}
 
 
@@ -80,16 +84,14 @@ class Printer:
             log.info(self.name + " Sending: " + command)
             self.serial.write((command + '\n').encode())  # Send g-code block
             # Wait for response with carriage return
-            while commandResponse != "ok":
-                grbl_out = self.serial.readline()
-                commandResponse = grbl_out.strip().decode("utf-8")
-                print(commandResponse)
+            self.waitResponse()
         # }}}
 
     # }}}
 
     # recordToSD {{{
     def recordToSD(self, filename, gcodeFile):
+        commandResponse = None
 
         self.serial.open()
 
@@ -116,30 +118,38 @@ class Printer:
                 self.bedClear = False  # The bed is no longer clear
                 self.jobStartTime = time.time()  # The job start time
                 self.serial.write(('M21 \n').encode())
-                self.serial.write('M28 {}.gco\n'.format(filename).encode())
+                print("M28 {}.gco".format(filename))
+                self.serial.write('M21\n'.encode())
+                self.waitResponse()
+                self.serial.write(('M928 {}.gco\n'.format(filename)).encode())
+                self.serial.flush()
                 log.info("Started writing {}.gco".format(filename))
+                self.waitResponse()
 
                 # Print the file {{{
+                counter = 0
                 for line in gcode:
                     # Run the remove comment function
                     commandComplete = False
                     command = self.removeComment(line)
                     command = command.strip()  # Strip all EOL characters for streaming
                     if (command.isspace() is False and len(command) > 0):
-                        log.info("Writing: " + command)
                         self.serial.write((command + '\n').encode())
-                        self.serial.flush()
+                        self.waitResponse()
+                        break
                 self.serial.write('M29 {}.gco\n'.format(filename).encode())
                 log.info("Finished writing {}.gco".format(filename))
+                self.serial.flush()
+                self.waitResponse()
                 # }}}
 
-                # Canceled print job {{{
-                else:
-                    log.warning("Print was canceled")
-                    self.serial.close()
-                    gcode.close()
-                    return False
-                # }}}
+            # Canceled print job {{{
+            else:
+                log.warning("Print was canceled")
+                self.serial.close()
+                gcode.close()
+                return False
+            # }}}
 
             # Finished Printing {{{
             self.serial.close()  # Close serial port
@@ -151,8 +161,11 @@ class Printer:
 
     # addToQueue {{{
     def addToQueue(self, filename, gcode):
+        filename = NTS.numberToString(filename)
+        print(filename)
         self.pQueue.append(filename)
-        log.info("{0} has been added to queue for {1}".format(filename, self.name))
+        log.info("{0} has been added to queue for {1}".format(
+            filename, self.name))
         self.recordToSD(filename, gcode)
 
     # }}}
@@ -239,7 +252,7 @@ class Printer:
         for i in range(len(self.pQueue)):
             print("Job {0} : {1}".format(i, self.pQueue[i]))
 
-    #}}}
+    # }}}
 
     # monitorPrinter {{{
     def monitorPrinter(self):
@@ -248,5 +261,25 @@ class Printer:
             commandResponse = grbl_out.strip().decode("utf-8")
             print(commandResponse)
     # }}}
+
+    # printFromSD {{{
+    def printFromSD(self):
+        self.serial.open()
+        self.serial.write('M32 {}.gco\n'.format(self.pQueue[0]).encode())
+        log.info("Started printing {}.gco".format(self.pQueue[0]))
+        self.waitResponse()
+        log.info("Done printing {}.gco".format(self.pQueue[0]))
+        self.serial.close()
+        # }}}
+
+    # waitResponse{{{
+    def waitResponse(self):
+        commandResponse = None
+        while commandResponse != "ok":
+            grbl_out = self.serial.readline()
+            commandResponse = grbl_out.strip().decode("utf-8")
+            print(commandResponse)
+    # }}}
+
 
 # }}}
