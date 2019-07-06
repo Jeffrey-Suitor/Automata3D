@@ -3,7 +3,6 @@ import numpy as np
 import cv2
 import time
 
-
 # Instructions {{{
 """
 TODO:
@@ -25,7 +24,6 @@ Need to add parallax calculations to the machine vision algorithm that way we ca
 
 # }}}
 
-
 # getCircles {{{
 def getCircles(image, circleType):
     if circleType == "bed":
@@ -42,10 +40,10 @@ def getCircles(image, circleType):
         circles = cv2.HoughCircles(image,
                                    cv2.HOUGH_GRADIENT,
                                    1,  # Type of detection
-                                   20,  # Distance between points
-                                   param1=60,  # Canny threshold
+                                   50,  # Distance between points
+                                   param1=130,  # Canny threshold
                                    param2=12,  # Base detection
-                                   minRadius=5,  # min rad
+                                   minRadius=6,  # min rad
                                    maxRadius=10)  # max rad
 
     return circles
@@ -69,6 +67,7 @@ def getAverageCircles(frameList, markerType, markers=2):
                 circles = sorted(circles, key=lambda x:x[:][0]) #Sort circles by x
                 for i in range(markers):
                     averageList[i].append(circles[i])
+
     # }}}
 
     if len(averageList[0]) > 1:
@@ -91,26 +90,36 @@ def getAverageCircles(frameList, markerType, markers=2):
 # }}}
 
 # cropImage {{{
-def cropImage(image, bedMarkers, nozzleMarkers):
-    markers = []
-    for marker in bedMarkers:
-        markers.append(marker)
-    for marker in nozzleMarkers:
-        markers.append(marker)
+def cropImage(image, bedMarkers=None, nozzleMarkers=None):
+    if bedMarkers and nozzleMarkers is None:
+        markers = bedMarkers
+        xMin = min(map(lambda x: x[0], markers))
+        xMax = max(map(lambda x: x[0], markers))
+
+        yMin = min(map(lambda x: x[1], markers))
+        yMax = max(map(lambda x: x[1], markers))
+        return image[:yMax-30, xMin:xMax], [0, yMax-30, xMin, xMax]
+
+    if bedMarkers and nozzleMarkers:
+        markers = []
+        for marker in bedMarkers:
+            markers.append(marker)
+        for marker in nozzleMarkers:
+            markers.append(marker)
 
 
-    xMin = min(map(lambda x: x[0], markers))
-    xMax = max(map(lambda x: x[0], markers))
+        yMin = min(map(lambda x: x[0], markers))
+        yMax = max(map(lambda x: x[0], markers))
 
-    yMin = min(map(lambda x: x[1], markers))
-    yMax = max(map(lambda x: x[1], markers))
-    return image[yMin:yMax, xMin:xMax]
+        xMin = min(map(lambda x: x[1], markers))
+        xMax = max(map(lambda x: x[1], markers))
+        return image[xMin:xMax, yMin:yMax],  [yMin, yMax, xMin, xMax]
 
 # }}}
 
 # locPrintHead {{{
 def locPrintHead(nozMarkers):
-    x = int((nozMarkers[1][0] - nozMarkers[0][0]) / 2 + nozMarkers[0][0])
+    x = int((nozMarkers[1][0] - nozMarkers[0][0]) / 2 + nozMarkers[0][0] - 30)
     y = int(nozMarkers[0][1] + 30)
     z = 0
     return [x, y, z]
@@ -150,11 +159,11 @@ def getHsvValues():
     bedUpper[0][0][1] = 255
     bedUpper[0][0][2] = 255
 
-    nozzleLower[0][0][0] = 39
-    nozzleLower[0][0][1] = 255
-    nozzleLower[0][0][2] = 255
+    nozzleLower[0][0][0] = 45
+    nozzleLower[0][0][1] = 25
+    nozzleLower[0][0][2] = 25
 
-    nozzleUpper[0][0][0] = 242
+    nozzleUpper[0][0][0] = 255
     nozzleUpper[0][0][1] = 255
     nozzleUpper[0][0][2] = 255
 
@@ -162,38 +171,35 @@ def getHsvValues():
 # }}}
 
 # findCircles {{{
-def findCircles(frameList, markerImage, outputImage, markerType, averageValue=10):
+def findCircles(frameList, markerImage, markerType, averageValue=10):
     averagedMarkers = None
-
-    # if more frames than desired {{{
     if len(frameList) > averageValue:
         averagedMarkers = getAverageCircles(frameList, markerType)
         del frameList[0]
-        # }}}
-
-    # if there are no averaged markers {{{
-    if averagedMarkers is None:
-        circles = getCircles(markerImage, markerType)
-        try:
-            circles = circles[0]
-            for circle in circles:
-                cv2.circle(outputImage, (circle[0], circle[1]), circle[2], (0, 255, 0), 2)
-                cv2.circle(outputImage, (circle[0], circle[1]), 2, (0, 0, 255), 3)
-                return None, outputImage
-        except TypeError:
-            pass
-    # }}}
-
-    else:
-        for circle in averagedMarkers:
-            cv2.circle(outputImage, (circle[0], circle[1]), circle[2], (0, 255, 0), 2)
-            cv2.circle(outputImage, (circle[0], circle[1]), 2, (0, 0, 255), 3)
-        return averagedMarkers, outputImage
+    if averagedMarkers is not None:
+        return averagedMarkers
 # }}}
+
+# drawCircles {{{
+def drawCircles(image, bedMarkers=None, nozzleMarkers=None, printHead=None):
+    if bedMarkers is not None:
+        for circle in bedMarkers:
+            cv2.circle(image, (circle[0], circle[1]), circle[2], (0, 255, 0), 2)
+            cv2.circle(image, (circle[0], circle[1]), 2, (0, 0, 255), 2)
+    if nozzleMarkers is not None:
+        for circle in nozzleMarkers:
+            cv2.circle(image, (circle[0], circle[1]), circle[2], (0, 255, 0), 2)
+            cv2.circle(image, (circle[0], circle[1]), 2, (0, 0, 255), 2)
+    if printHead is not None:
+        cv2.circle(output, (printHead[0], printHead[1]), 3, (255, 0, 0), 2)
+    return image
+
+#}}}
 
 
 if __name__ == '__main__':
 
+    # setup {{{
     cap = cv2.VideoCapture("/dev/Cameras/MachineVision")
     bedFrames = []
     nozzleFrames = []
@@ -201,33 +207,49 @@ if __name__ == '__main__':
     avgBed = None
     avgNozzle = None
 
+    # }}}
+
     while True:
 
         # getImage {{{
         ret, image = cap.read()
         image = cv2.flip(image, 0)
         output = image.copy()
+        output2 = image.copy()
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         bedMask, nozzleMask = markerImage(image)
-        bedImage = cv2.GaussianBlur(bedMask, (1, 1), 0)
-        nozzleImage = cv2.GaussianBlur(nozzleMask, (1, 1), 0)
+        bedImage = cv2.GaussianBlur(bedMask, (5, 5), 0)
+        nozzleImage = cv2.GaussianBlur(nozzleMask, (5, 5), 0)
         # }}}
 
         bedFrames.append(bedImage)
         nozzleFrames.append(nozzleImage)
         avgBed = None
         avgNozzle = None
-        try:
-            avgBed, output = findCircles(bedFrames, bedImage, output, "bed")
-            avgNozzle, output = findCircles(nozzleFrames, nozzleImage, output, "nozzle")
-        except TypeError:
-            pass
-        if avgBed and avgNozzle:
-            cropped = cropImage(output, avgNozzle, avgBed)
-            printHead = locPrintHead(avgNozzle)
-            cv2.circle(output, (printHead[0], printHead[1]), 10, (255, 0, 0), 10)
+        printHead = None
+        avgBed = findCircles(bedFrames, bedImage, "bed")
+        if avgBed:
+            nozzleOutput, s = cropImage(nozzleImage, bedMarkers=avgBed)
+            avgNozzle = findCircles(nozzleFrames, nozzleOutput, "nozzle")
+            kernel = np.ones((10,10),np.uint8)
+            opening = cv2.morphologyEx(nozzleOutput, cv2.MORPH_OPEN, kernel)
+            avgNozzle = getCircles(nozzleOutput, "nozzle")
+            nozzleOutput = output[s[0]:s[1], s[2]:s[3]]
+            nozzleOutput = cv2.bitwise_and(nozzleOutput, nozzleOutput, mask=nozzleMask[s[0]:s[1], s[2]:s[3]])
+            try:
+                avgNozzle = avgNozzle[0]
+            except TypeError:
+                pass
+            if len(avgNozzle) != 2:
+                print(len(avgNozzle))
+                drawCircles(nozzleOutput, avgBed, avgNozzle, printHead)
+                cv2.imshow("output", nozzleOutput)
+                cv2.waitKey(0)
+        #if avgNozzle:
+            #processingImage = cropImage(output, bedMarkers=avgBed, nozzleMarkers=avgNozzle)
+            #printHead = locPrintHead(avgNozzle)
+        else:
+            print("failed")
 
-        cv2.imshow("output", output)
-        #cv2.imshow("output", bedImage)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
