@@ -1,34 +1,24 @@
-from statistics import mean
 import numpy as np
 import cv2
-import time
 import itertools
 import logging as log
+from skimage.measure import compare_ssim
+import time
 
 # Logger {{{
 log.basicConfig(level=log.INFO)
 logger = log.getLogger(__name__)
 #}}}
 
-# Instructions {{{
-"""
-TODO:
+# Exceptions {{{
+class runoutError(Exception):
+    pass
 
-difImages
-Get 3 images and compare them. If there are big changes horizontally than there is likely a print failure
+class printError(Exception):
+    pass
 
-hsvSelection
-Add the ability to select the print material from the image and use HSV to hide the background.
-
-blob detection
-The biggest object of the same colour in the frame is selected as the main object.
-If there are too many changes from the center of the box than abort because it detached
-
-Compare the top of the box bounding box against the position of the nozzle to determine if the filament ran out.
-
-Need to add parallax calculations to the machine vision algorithm that way we can print in 3 dimensions.
-"""
-
+class detectionError(Exception):
+    pass
 # }}}
 
 # getCircles {{{
@@ -146,13 +136,10 @@ def locPrintHead(nozMarkers):
 # markerImage {{{
 def markerImage(image):
     bedMrk = nozMrk = prtMrk = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-
     bedL, bedU, nozL, nozU, prtL, prtU = getHsvValues()
-
     bedMask = cv2.inRange(bedMrk, bedL, bedU)
     nozzleMask = cv2.inRange(nozMrk, nozL, nozU)
     partMask = cv2.inRange(prtMrk, prtL, prtU)
-
     return bedMask, nozzleMask, partMask
 # }}}
 
@@ -160,10 +147,10 @@ def markerImage(image):
 def getHsvValues():
     bedLower = np.uint8([[150, 150, 150]])
     bedUpper = np.uint8([[255, 255, 255]])
-    nozzleLower = np.uint8([[47, 35, 35]])
-    nozzleUpper = np.uint8([[252, 255, 255]])
-    partLower = np.uint8([[82, 50, 40]])
-    partUpper = np.uint8([[110, 200, 200]])
+    nozzleLower = np.uint8([[42, 35, 150]])
+    nozzleUpper = np.uint8([[170, 255, 255]])
+    partLower = np.uint8([[76, 50, 10]])
+    partUpper = np.uint8([[100, 200, 200]])
     return bedLower, bedUpper, nozzleLower, nozzleUpper, partLower, partUpper
 # }}}
 
@@ -195,14 +182,63 @@ def drawCircles(image, bedMarkers=None, nozzleMarkers=None, printHead=None):
 
 #}}}
 
-# filamentRunOut {{{
-def filamentRunout(printHead, partBox):
-    _, partY, _, _ = partBox
-    _, pHeadY, _ = printHead
-    if partY - pHeadY > 20:
-        # TODO: Add a custom exception here for print run out
+# checkErrors {{{
+def checkErrors(image, errList, avgBed, avgNozzle, avg=30, divValue=3):
 
-#}}}
+    for i in range(len(errList)):
+        if len(errList[i]) > avg:
+            errList[i] = errList[i][-avg:]
+        if len(errList[i]) < avg:
+            return
+
+
+    boundList = errList[0]
+    printErrorCount = 0
+    filamentErrorCount = 0
+    detectionErrorCount = 0
+    iniErr = 0
+    printHeadY = [row[1] for row in errList[1]]
+    partBoxY = [row[1] for row in boundList]
+    partBoxH = [row[2] for row in boundList]
+    errorNum = int(avg/divValue)
+    bBox = boundList[-1]
+    print(bBox)
+    print(avgNozzle[0])
+
+    if np.mean(partBoxH) < 50:
+        try:
+            if avgBed[0][1] - avgNozzle[0][1] > 100:
+                raise runoutError("Too great bed and nozzle seperation")
+        except TypeError:
+            log.debug("Improperly formed markers")
+    else:
+        cv2.rectangle(image, (bBox[0], bBox[1]), (bBox[0]+bBox[2], bBox[1]+bBox[3]), (255, 255, 0), 2)
+
+    for i in range(len(boundList)-1):
+
+        # Check for filament run out
+        if partBoxY[i] - printHeadY[i] > 50:
+            filamentErrorCount += 1
+            if filamentErrorCount > errorNum:
+                raise runoutError("You have run out of print filament")
+        if printHeadY[i] - partBoxY[i] < -50:
+            detectionErrorCount += 1
+            if detectionErrorCount > errorNum:
+                raise detectionError("There hass been an error in detection")
+
+
+
+        # Check bounding box sizes
+        for j in range(len(boundList[0])):
+            if abs(boundList[i][j] - boundList[i+1][j]) > 50:
+                iniErr = boundList[i]
+            if iniErr != 0:
+                if abs(iniErr[j] - boundList[i][j]) > 50:
+                    printErrorCount += 1
+                    break
+                    if printErrorCount > errorNum:
+                        raise printError("Print failure detected")
+# }}}
 
 # main {{{
 def main():
@@ -210,7 +246,7 @@ def main():
     cap = cv2.VideoCapture("/dev/Cameras/MachineVision")
     bedFrames = []
     nozzleFrames = []
-    partFrames = []
+    errorList = [[], []]
     averagedListValues = None
     avgBed = None
     avgNozzle = None
@@ -219,6 +255,7 @@ def main():
     # }}}
 
     while True:
+        startTime = time.time()
 
         try:
             # getImage {{{
@@ -241,8 +278,9 @@ def main():
             if avgBed:
                 log.debug("Bed found")
                 nozzleProcess = cropImage(nozzleImage, bedMarkers=avgBed)
-                kernel = np.ones((1,1),np.uint8)
+                kernel = np.ones((3,3),np.uint8)
                 nozzleProcess = cv2.morphologyEx(nozzleProcess, cv2.MORPH_OPEN, kernel)
+                nozzleProcess = cv2.medianBlur(nozzleProcess, 7)
                 nozzleFrames.append(nozzleProcess)
                 avgNozzle = findCircles(nozzleFrames, "nozzle")
                 # }}}
@@ -251,23 +289,22 @@ def main():
             if avgNozzle:  # If we find the bed and the nozzle find the part
                 log.debug("Nozzle found")
                 printHead = locPrintHead(avgNozzle)
-                partProcess = cv2.medianBlur(partImage, 51)
+                errorList[1].append(printHead)
+                partProcess = cv2.medianBlur(partImage, 47)
+                cv2.imshow("3D Print", partProcess)
                 contours, hierarchy = cv2.findContours(partProcess, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-                part = sorted(contours, key=cv2.contourArea, reverse=True)[0]
-                bBox = cv2.boundingRect(part)
-                cv2.rectangle(image, (bBox[0], bBox[1]), (bBox[0]+bBox[2], bBox[1]+bBox[3]), (0, 255, 0), 2)
+                if contours:
+                    part = sorted(contours, key=cv2.contourArea, reverse=True)[0]
+                    bBox = cv2.boundingRect(part)
+                    errorList[0].append(bBox)
+                    checkErrors(image, errorList, avgBed, avgNozzle)
             # }}}
-
-            # Error Detection {{{
-
-
-            # }}}
-
 
             drawCircles(image, avgBed, avgNozzle, printHead)
             cv2.imshow("3D Print", image)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
+                cv2.waitKey(0)
                 break
         except cv2.error:
             pass
